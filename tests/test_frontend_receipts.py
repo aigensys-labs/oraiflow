@@ -54,9 +54,10 @@ def test_successful_browser_receipt_produces_precise_editable_draft_acknowledgem
     )
     assert result is not None
     message, receipt = result
-    assert (
-        "editable transfer draft for 1 EUR to John Carter from Everyday account is open" in message
-    )
+    assert "editable transfer draft is open" in message
+    assert "1 EUR" in message
+    assert "John Carter" in message
+    assert "Everyday account" in message
     assert "Nothing has been previewed, approved or submitted" in message
     assert receipt["status"] == "draft_opened"
     assert receipt["workflow_id"] == WORKFLOW_ID

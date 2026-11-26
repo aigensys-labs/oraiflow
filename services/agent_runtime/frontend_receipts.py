@@ -113,12 +113,12 @@ def transfer_draft_receipt_message(
     transfer_label = " ".join(part for part in (amount, currency) if part)
     if source_name:
         reply = (
-            f"Your editable transfer draft for {transfer_label} to {beneficiary} from {source_name} is open. "
+            f"Your editable transfer draft is open for {transfer_label} to {beneficiary} from {source_name}. "
             "You can review or close it. Nothing has been previewed, approved or submitted."
         )
     else:
         reply = (
-            f"Your editable transfer draft for {transfer_label} to {beneficiary} is open. "
+            f"Your editable transfer draft is open for {transfer_label} to {beneficiary}. "
             "You can review or close it. Nothing has been previewed, approved or submitted."
         )
     receipt = {

@@ -1,4 +1,4 @@
-# Transfer preparation workflow — current contract (v0.7.7)
+# Transfer preparation workflow — current contract (v0.7.8)
 
 ## Scope and authority
 

@@ -286,9 +286,32 @@ async def _call_read_capability(tool_name: str, arguments: dict[str, Any] | None
 
         try:
             provider_envelope = parse_result_envelope(capability_id, raw)
-        except (TypeError, ValueError, ContractViolation):
+        except ContractViolation as exc:
+            # Keep envelope-shape failures distinct from structurally valid
+            # envelopes whose capability payload violates the registered output
+            # schema. Both are rejected, but the diagnostic must identify the
+            # connector response as the source of invalid data.
+            error_code = (
+                "INVALID_CONNECTOR_RESPONSE"
+                if exc.section == "output"
+                else "INVALID_CONNECTOR_ENVELOPE"
+            )
             logger.warning(
-                "capability_output_rejected trace_id=%s capability=%s error_type=CONTRACT_VIOLATION",
+                "capability_output_rejected trace_id=%s capability=%s reason=%s",
+                trace_id,
+                capability_id,
+                error_code,
+            )
+            envelope = create_result_envelope(
+                capability_id,
+                "INVALID_RESPONSE",
+                error={"code": error_code, "retryable": False},
+                trace_id=trace_id,
+            )
+            break
+        except (TypeError, ValueError):
+            logger.warning(
+                "capability_output_rejected trace_id=%s capability=%s reason=INVALID_CONNECTOR_ENVELOPE",
                 trace_id,
                 capability_id,
             )
@@ -644,11 +667,15 @@ def _customer_safe_component_failure(component_name: str, invalid: bool = False)
 
 
 def _presentation_source_result(messages, presentation: dict[str, Any], context: dict[str, Any]):
+    """Return a presentation source with its validation diagnostic intact."""
     for capability_id, _arguments in _preflight_candidates(presentation, context):
-        seen, envelope = _capability_result_for_turn(messages, capability_id)
+        seen, envelope, reason, outcome, error_code = _capability_result_diagnostic(
+            messages,
+            capability_id,
+        )
         if seen:
-            return capability_id, envelope
-    return None, None
+            return capability_id, envelope, reason, outcome, error_code
+    return None, None, None, None, None
 
 
 def _apply_presentation_transform(
@@ -697,9 +724,26 @@ def _bind_verified_component_data(
         presentation = get_registry().get("presentations", {}).get(presentation_name)
         if not presentation:
             continue
-        capability_id, envelope = _presentation_source_result(messages, presentation, context)
-        if not capability_id or not envelope:
+        capability_id, envelope, reason, outcome, _error_code = _presentation_source_result(
+            messages,
+            presentation,
+            context,
+        )
+        if not capability_id:
             return _customer_safe_component_failure(presentation_name)
+        if envelope is None:
+            invalid_reasons = {
+                "INVALID_RESULT_ENVELOPE",
+                "INVALID_DATA_SHAPE",
+                "INVALID_DATA_RECORD",
+                "INVALID_DATA_SCHEMA",
+                "INVALID_EVIDENCE",
+                "TRUST_CLASS_MISMATCH",
+            }
+            return _customer_safe_component_failure(
+                presentation_name,
+                invalid=reason in invalid_reasons or outcome == "INVALID_RESPONSE",
+            )
         binding = presentation["binding"]
         data = envelope.get("data")
         evidence = dict(envelope.get("evidence") or {})
@@ -2089,11 +2133,12 @@ def _internal_read_tool_call(tool_name: str, workflow: dict[str, Any]) -> AIMess
 
 
 def _academy_personal_data_read_step(state: ORAIState) -> AIMessage | None:
-    """Fetch a registered personal-data capability before personalized Academy guidance.
+    """Schedule the registered personal-data read for an Academy explanation.
 
-    Academy catalogue metadata maps a topic to its required intent. The read is
-    runtime-owned, read-only, and still passes the common OCCF input/result
-    validation path. It is performed at most once per customer turn.
+    This function owns only read scheduling. Once a result arrives,
+    ``_academy_personal_data_response_step`` composes the deterministic
+    explanation. Keeping the two phases separate makes retry/re-entry behavior
+    explicit and prevents accidental duplicate reads.
     """
     messages = list(state.get("messages", []))
     current_text = latest_human_text(messages)
@@ -2111,37 +2156,14 @@ def _academy_personal_data_read_step(state: ORAIState) -> AIMessage | None:
         return AIMessage(
             content="I couldn't retrieve the current financial information needed for that explanation. Please try again."
         )
-    seen, result = _capability_result_for_turn(messages, capability_id)
+
+    # The read step is intentionally idempotent: a result already present in
+    # this turn means there is nothing else to schedule. Response rendering is
+    # handled by the subsequent response step.
+    seen, _result = _capability_result_for_turn(messages, capability_id)
     if seen:
-        if intent_id == "LOAN_INFORMATION":
-            if result is None:
-                return AIMessage(
-                    content="I couldn't retrieve a complete, verified loan schedule just now. Please try again or open Loans to review the available record."
-                )
-            outcome = str(result.get("outcome", ""))
-            data = result.get("data")
-            if outcome == "EMPTY" or not data:
-                return AIMessage(
-                    content="I couldn't find an illustrative loan record in your ORAIflow profile. I can still explain principal, interest and APR generally, but I won't invent loan terms or instalment dates."
-                )
-            if outcome != "SUCCESS" or not isinstance(data, dict):
-                return AIMessage(
-                    content="The loan information was incomplete, so I won't present it as a complete repayment schedule. Please review Loans or try again."
-                )
-            return AIMessage(content=render_loan_schedule_explanation(data))
-        if intent_id == "FINANCIAL_HEALTH_EXPLANATION":
-            if result is None:
-                return AIMessage(
-                    content="I couldn't validate the current Financial Health snapshot, so I won't guess at your ratios. Please try again or open Overview."
-                )
-            outcome = str(result.get("outcome", ""))
-            data = result.get("data")
-            if outcome not in {"SUCCESS", "PARTIAL"} or not isinstance(data, dict):
-                return AIMessage(
-                    content="I couldn't retrieve a complete Financial Health snapshot. I can explain the general concepts, but I won't invent your personal ratios."
-                )
-            return AIMessage(content=render_financial_health_explanation(data, current_text))
         return None
+
     capability = get_capability(capability_id)
     if (
         capability.get("kind") != "mcp"
@@ -2193,6 +2215,67 @@ def _academy_personal_data_read_step(state: ORAIState) -> AIMessage | None:
         capability_id,
     )
     return message
+
+
+def _academy_personal_data_response_step(state: ORAIState) -> AIMessage | None:
+    """Render Academy guidance only after the current turn's personal read returns.
+
+    The result envelope is validated by the shared capability-result layer.
+    Invalid, partial and unavailable outcomes are described honestly; no
+    personal ratios or repayment terms are invented.
+    """
+    messages = list(state.get("messages", []))
+    current_text = latest_human_text(messages)
+    intent_id = academy_personal_snapshot_intent(current_text)
+    if not intent_id:
+        return None
+    intent = get_registry().get("intents", {}).get(intent_id, {})
+    capability_id = intent.get("execution_plan", {}).get("capability")
+    if not capability_id:
+        return None
+    seen, result, reason, outcome, _error_code = _capability_result_diagnostic(
+        messages,
+        capability_id,
+    )
+    if not seen:
+        return None
+    if result is None:
+        if outcome == "UNAVAILABLE":
+            return AIMessage(
+                content="I couldn't retrieve the recorded information needed for that explanation just now. Please try again."
+            )
+        return AIMessage(
+            content="I couldn't verify the recorded information returned for that explanation, so I won't interpret it. Please try again."
+        )
+
+    if intent_id == "LOAN_INFORMATION":
+        data = result.get("data")
+        if result.get("outcome") == "EMPTY" or not data:
+            return AIMessage(
+                content="I couldn't find an illustrative loan record in your ORAIflow profile. I can still explain principal, interest and APR generally, but I won't invent loan terms or instalment dates."
+            )
+        if result.get("outcome") != "SUCCESS" or not isinstance(data, dict):
+            return AIMessage(
+                content="The loan information was incomplete, so I won't present it as a complete repayment schedule. Please review Loans or try again."
+            )
+        return AIMessage(content=render_loan_schedule_explanation(data))
+
+    if intent_id == "FINANCIAL_HEALTH_EXPLANATION":
+        data = result.get("data")
+        if result.get("outcome") not in {"SUCCESS", "PARTIAL"} or not isinstance(data, dict):
+            return AIMessage(
+                content="I couldn't retrieve a complete Financial Health snapshot. I can explain the general concepts, but I won't invent your personal ratios."
+            )
+        return AIMessage(content=render_financial_health_explanation(data, current_text))
+    return None
+
+
+def _academy_personal_data_route(state: ORAIState) -> AIMessage | None:
+    """Schedule an Academy snapshot or answer from its validated current-turn result."""
+    scheduled = _academy_personal_data_read_step(state)
+    if scheduled is not None:
+        return scheduled
+    return _academy_personal_data_response_step(state)
 
 
 def _prepare_transfer_draft_action(
@@ -3504,7 +3587,7 @@ def build_graph(checkpointer=None):
         # fast routes. Each handler is an existing resource/read/workflow owner;
         # the policy does not duplicate its capability schema or business logic.
         route_handlers = {
-            "academy_personal_read": lambda: _academy_personal_data_read_step(state),
+            "academy_personal_read": lambda: _academy_personal_data_route(state),
             "workspace_navigation": lambda: _workspace_navigation_step(current_text, state),
             "workspace_knowledge": lambda: workspace_help_for_request(current_text),
             "academy_education": lambda: academy_direct_guidance_for_request(current_text),

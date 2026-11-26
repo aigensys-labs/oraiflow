@@ -1,6 +1,6 @@
 # Interpretation Assessment — current protocol
 
-**Current package:** `v0.7.7`  
+**Current package:** `v0.7.8`  
 **OCCF registry:** `1.5.17`
 
 ## Purpose and authority boundary

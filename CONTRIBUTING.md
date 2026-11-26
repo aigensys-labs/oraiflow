@@ -30,6 +30,8 @@ When opening a pull request, use the repository's pull request template. Securit
 Run the relevant checks from the repository root:
 
 ```bash
+git clone https://github.com/aigensys-labs/oraiflow.git
+cd oraiflow
 uv lock
 uv sync --locked --group dev
 uv run --locked python scripts/generate_contracts.py --check

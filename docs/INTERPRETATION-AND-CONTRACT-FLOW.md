@@ -14,7 +14,7 @@ It complements rather than replaces the technical architecture documentation:
 
 The intended audience is anyone designing, implementing, reviewing or evaluating the behavior of the Agent. This is the behavioral contract: what each stage is allowed to understand, decide, carry forward and execute.
 
-**Current package baseline:** `v0.7.7`, OCCF registry `1.5.17`. This document describes the current implementation at that baseline, including its limitations and integration requirements. It is not a claim that every configured provider, browser or institution integration has passed end-to-end acceptance.
+**Current package baseline:** `v0.7.8`, OCCF registry `1.5.17`. This document describes the current implementation at that baseline, including its limitations and integration requirements. It is not a claim that every configured provider, browser or institution integration has passed end-to-end acceptance.
 
 ## 1. The governing idea
 
@@ -380,7 +380,7 @@ If the phrasing is ambiguous (for example, it could refer to a specific singular
 
 ## 6. Current implementation and known limitations
 
-The current `v0.7.7` package includes the generic transaction-analysis capability, registry-backed monthly/category semantics, the Academy-vs-analysis route precedence guard, extended synthetic local activity fixtures, current-turn AG-UI presentation/action handling, verified saved-contact summaries and transfer replay protection that recognizes a verified draft receipt even when assistant acknowledgement metadata is stripped during transcript serialization. It preserves the rule that browser draft preparation is separate from Banking Kernel preview, customer confirmation, SCA and execution.
+The current `v0.7.8` package includes the generic transaction-analysis capability, registry-backed monthly/category semantics, the Academy-vs-analysis route precedence guard, extended synthetic local activity fixtures, current-turn AG-UI presentation/action handling, verified saved-contact summaries and transfer replay protection that recognizes a verified draft receipt even when assistant acknowledgement metadata is stripped during transcript serialization. It preserves the rule that browser draft preparation is separate from Banking Kernel preview, customer confirmation, SCA and execution.
 
 The table below distinguishes what exists in source from the verification or maturity still required before relying on it in a real institution deployment.
 

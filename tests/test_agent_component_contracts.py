@@ -14,6 +14,8 @@ from services.agent_runtime.agent import (
     _frontend_action_acknowledgement,
     _customer_assessment_message,
     _academy_personal_data_read_step,
+    _academy_personal_data_response_step,
+    _academy_personal_data_route,
     _pending_semantic_tasks,
 )
 from shared.contracts.registry import create_result_envelope, get_registry, parse_result_envelope
@@ -73,6 +75,7 @@ def test_account_component_uses_selected_account_context_for_mcp_preflight():
                             },
                         ],
                         "contacts": [],
+                        "agent_turn_contract_version": "1.1.0",
                     },
                 }
             ],
@@ -704,6 +707,7 @@ def test_model_cannot_choose_first_source_account_when_multiple_are_available():
 
 
 def test_model_may_use_one_unique_currency_account_without_a_current_selection():
+    """A sole compatible account avoids clarification but is still re-read before drafting."""
     proposed = AIMessage(
         content="",
         tool_calls=[
@@ -730,16 +734,47 @@ def test_model_may_use_one_unique_currency_account_without_a_current_selection()
             {
                 "contact_id": CONTACTS[0]["contact_id"],
                 "full_name": CONTACTS[0]["full_name"],
-                "status": "ACTIVE",
+                "status": CONTACTS[0]["status"],
             }
         ],
     }
-    messages = [
-        HumanMessage(content="Send 50 EUR to John Carter"),
-        _trusted_tool_message("search_contacts", [CONTACTS[0]], "source-search-2"),
-    ]
-    result = _validate_proposed_tool_calls(proposed, messages, context)
-    assert result.tool_calls and result.tool_calls[0]["name"] == "prepare_transfer_draft"
+    request = HumanMessage(content="Send 50 EUR to John Carter")
+    messages = [request, _trusted_tool_message("search_contacts", [CONTACTS[0]], "source-search-2")]
+
+    # The model still cannot execute the draft action directly. The runtime-owned
+    # workflow must select the sole currency-compatible source and verify it via MCP.
+    rejected = _validate_proposed_tool_calls(proposed, messages, context)
+    assert not rejected.tool_calls
+    assert "verify the saved recipient and source account" in rejected.content.casefold()
+
+    from services.agent_runtime.agent import (
+        _handle_transfer_workflow,
+        _start_explicit_transfer_workflow,
+    )
+
+    started = _start_explicit_transfer_workflow({"messages": [request]}, context)
+    assert started is not None
+    assert started.tool_calls[0]["name"] == "search_contacts"
+    contact_result = _trusted_tool_message(
+        "search_contacts", [CONTACTS[0]], "source-search-canonical"
+    )
+    state = {
+        "messages": [request, started, contact_result],
+        "copilotkit": {
+            "context": [
+                {
+                    "description": "Current ORAIflow workspace and account selection",
+                    "value": context,
+                }
+            ]
+        },
+    }
+    verification = _handle_transfer_workflow(state, context)
+    assert verification is not None
+    assert verification.tool_calls[0]["name"] == "list_customer_accounts"
+    workflow = workflow_from_message(verification)
+    assert workflow["source_account_id"] == "acc-001"
+    assert workflow["stage"] == "VERIFYING_SOURCE_ACCOUNT"
 
 
 def _agent_test_context():
@@ -797,8 +832,9 @@ def test_explicit_transfer_request_enters_the_canonical_workflow_before_semantic
     started = _start_explicit_transfer_workflow(state, context)
 
     assert started is not None
-    assert started.content.strip()
-    assert "checking your saved contacts" in started.content.casefold()
+    # Copilot renders this runtime-owned read as tool activity; do not duplicate
+    # the progress status as a second assistant chat message.
+    assert started.content == ""
     assert started.tool_calls[0]["name"] == "search_contacts"
     assert started.tool_calls[0]["args"] == {"name_query": "Lucas"}
     workflow = latest_pending_workflow([request, started])
@@ -1232,15 +1268,38 @@ def test_academy_personal_financial_health_question_schedules_registered_read_on
     )
     resumed = {"messages": [HumanMessage(content=question), read, existing], "copilotkit": {}}
     assert _academy_personal_data_read_step(resumed) is None
+    explanation = _academy_personal_data_route(resumed)
+    assert explanation is not None
+    assert "Financial Health badge" in explanation.content
 
 
 def test_academy_general_credit_score_question_does_not_schedule_personal_snapshot():
     question = (
-        "How is a credit score different from my ORAIflow Financial Health badge, "
+        "How is a credit score different from an ORAIflow Financial Health badge, "
         "and what habits can help maintain a healthy credit history?"
     )
     state = {"messages": [HumanMessage(content=question)], "copilotkit": {}}
     assert _academy_personal_data_read_step(state) is None
+    from services.agent_runtime.academy import academy_direct_guidance_for_request
+
+    guidance = academy_direct_guidance_for_request(question)
+    assert guidance is not None
+    assert "credit score" in guidance.casefold()
+
+    # The paired personal wording explicitly claims ownership and therefore
+    # must schedule the registered read before comparing the customer's badge.
+    personal_question = (
+        "How is a credit score different from my ORAIflow Financial Health badge, "
+        "and what habits can help maintain a healthy credit history?"
+    )
+    personal_state = {
+        "messages": [HumanMessage(content=personal_question)],
+        "copilotkit": {},
+    }
+    personal_read = _academy_personal_data_read_step(personal_state)
+    capability = get_registry()["capabilities"]["banking.financial_health.overview"]
+    assert personal_read is not None
+    assert personal_read.tool_calls[0]["name"] == capability["name"]
 
 
 def test_unrelated_salary_question_does_not_inherit_a_pending_transfer_clarification():

@@ -11,7 +11,7 @@ def _json(path: str) -> dict:
 
 
 def test_python_and_javascript_packages_share_the_release_version():
-    assert __version__ == "0.7.7"
+    assert __version__ == "0.7.8"
     assert _json("apps/web/package.json")["version"] == __version__
     assert _json("services/copilot_runtime/package.json")["version"] == __version__
     env_example = (ROOT / ".env.example").read_text(encoding="utf-8")

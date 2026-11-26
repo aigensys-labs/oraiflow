@@ -1,6 +1,6 @@
 # ORAIflow Core — zero-to-hero local guide
 
-This is the current hands-on local walkthrough for package `v0.7.7`. It uses **Bash** syntax (Linux, macOS, WSL or Git Bash) and Docker Compose v2. For the authoritative interpretation, capability ownership and service boundaries, use [Interpretation and Contract Flow](INTERPRETATION-AND-CONTRACT-FLOW.md), [Capability Contracts](CAPABILITY-CONTRACTS.md) and [Architecture](ARCHITECTURE.md). The default `LLM_PROVIDER=demo` is a deterministic demonstration path, not a semantic-quality test; connect a configured model for interpretation acceptance.
+This is the current hands-on local walkthrough for package `v0.7.8`. It uses **Bash** syntax (Linux, macOS, WSL or Git Bash) and Docker Compose v2. For the authoritative interpretation, capability ownership and service boundaries, use [Interpretation and Contract Flow](INTERPRETATION-AND-CONTRACT-FLOW.md), [Capability Contracts](CAPABILITY-CONTRACTS.md) and [Architecture](ARCHITECTURE.md). The default `LLM_PROVIDER=demo` is a deterministic demonstration path, not a semantic-quality test; connect a configured model for interpretation acceptance.
 
 > This is a self-hosted synthetic fintech demo. It does not connect to a bank, use real customer data, authenticate real customers or move real money.
 
