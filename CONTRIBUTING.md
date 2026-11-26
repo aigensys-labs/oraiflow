@@ -85,12 +85,6 @@ By submitting a contribution to this project, you agree that:
    licenses above and that your contribution does not infringe any
    third-party intellectual property rights.
 
-## Other Ways to Contribute
-
-- Fix or improve documentation
-- Share feedback on issues or PRs
-- Write a blog post or tutorial using ORAIflow and let us know
-
 ## Public documentation policy
 
 The public repository contains stable product, architecture, configuration, security, operations, testing and contributor documentation. Maintainer-only roadmaps, chronological development changelogs, release-validation evidence, internal acceptance matrices, trace-specific debug runbooks, product-positioning briefs and demo storyboards are distributed separately from the source repository. Do not add links to those private/maintainer materials from public documentation. For a release, keep the public source archive and companion internal-document archive at the same version.
@@ -100,6 +94,13 @@ The public repository contains stable product, architecture, configuration, secu
 `pyproject.toml` is the authoritative location for Python project metadata, runtime/development dependencies, pytest settings, Black formatting and Ruff lint configuration. Black is the only Python formatter; do not combine it with competing auto-formatters. Ruff provides correctness-focused linting. Public production modules, classes and functions must have concise Google-convention docstrings that explain intent and important authority or side-effect boundaries. Add `Args`, `Returns` and `Raises` sections where they materially clarify a non-trivial interface. Do not write docstrings that merely repeat a function name.
 
 Run `make format` before submitting Python changes. Run `make quality` to check Black formatting across the complete Python tree, Ruff rules and production docstring coverage. CI checks Black formatting for Python files changed by the push or pull request; Ruff, Python syntax compilation, documentation coverage and tests run across the repository. The existing v0.7.x tree has not yet had a verified full Black normalization pass, so do not claim the entire legacy tree is Black-clean until `make format` and `make quality` both pass. ORAIflow is a Docker-first demo application: Python/uv are developer tools, not prerequisites for running the public demo. Do not add a separate dependency list to a `requirements.txt` file.
+
+
+## Other Ways to Contribute
+
+- Fix or improve documentation
+- Share feedback on issues or PRs
+- Write a blog post or tutorial using ORAIflow and let us know
 
 ## Questions?
 

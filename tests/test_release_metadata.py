@@ -56,7 +56,7 @@ def test_pyproject_is_the_authoritative_python_application_manifest():
     import tomllib
 
     metadata = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-    assert metadata["project"]["name"] == "oraiflow-core"
+    assert metadata["project"]["name"] == "oraiflow"
     assert metadata["project"]["version"] == __version__
     assert metadata["project"]["requires-python"] == ">=3.12"
     assert metadata["tool"]["uv"]["package"] is False
