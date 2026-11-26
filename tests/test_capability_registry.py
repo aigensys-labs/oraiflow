@@ -67,14 +67,14 @@ def test_rich_semantic_inputs_are_not_duplicated_in_legacy_slot_metadata():
         if not semantic_inputs:
             continue
         semantic_slot_names = {
-            field for field, spec in semantic_inputs.items()
+            field
+            for field, spec in semantic_inputs.items()
             if spec.get("location", "slots") == "slots"
         }
         assert not semantic_slot_names.intersection(plan.get("optional_slots", [])), intent_id
         assert not semantic_slot_names.intersection(plan.get("required_slots", [])), intent_id
         assert not semantic_slot_names.intersection(plan.get("slot_descriptions", {})), intent_id
         assert not semantic_slot_names.intersection(plan.get("slot_values", {})), intent_id
-
 
 
 def test_registry_rejects_duplicate_legacy_declarations_of_semantic_inputs():
@@ -98,6 +98,7 @@ def test_registry_rejects_duplicate_legacy_declarations_of_semantic_inputs():
     period["default_policy"] = "when_unspecified"
     validate_registry_consistency(registry)
 
+
 def test_every_agent_capability_has_input_output_execution_and_authorization_contracts():
     for contract_id, contract in get_registry()["capabilities"].items():
         assert contract["input_schema"]
@@ -109,9 +110,9 @@ def test_every_agent_capability_has_input_output_execution_and_authorization_con
         assert capability_by_name(contract["name"])[0] == contract_id
 
 
-
 def test_loan_overview_can_return_a_valid_empty_result_when_no_recorded_loan_exists():
     assert validate_capability_output("banking.loans.overview", {}) == {}
+
 
 def test_application_context_uses_registered_schema_and_is_read_only():
     from shared.contracts.registry import get_registry
@@ -183,7 +184,11 @@ def test_agent_assisted_intents_map_to_registered_capabilities_or_catalogue_reso
             assert plan["response_mode"]
         else:
             assert plan["response_mode"] in {"registered_catalogue", "registered_resource"}
-            assert plan["resource_id"] in {"assistant_capabilities", "academy_topics", "workspace_catalogue"}
+            assert plan["resource_id"] in {
+                "assistant_capabilities",
+                "academy_topics",
+                "workspace_catalogue",
+            }
 
 
 def test_loan_overview_is_read_only_and_separate_from_deposit_accounts():
@@ -193,8 +198,15 @@ def test_loan_overview_is_read_only_and_separate_from_deposit_accounts():
     assert contract["authorization"]["agent_invocable"] is True
     assert contract["execution"]["effect"] == "read_only"
     assert contract["input_schema"]["properties"] == {}
-    assert "banking.loans.overview" not in get_registry()["presentations"]["render_account_summary"]["binding"]["source_capabilities"]
-    assert "banking.loans.overview" not in get_registry()["capabilities"]["banking.accounts.list"]["output_schema"].get("properties", {})
+    assert (
+        "banking.loans.overview"
+        not in get_registry()["presentations"]["render_account_summary"]["binding"][
+            "source_capabilities"
+        ]
+    )
+    assert "banking.loans.overview" not in get_registry()["capabilities"]["banking.accounts.list"][
+        "output_schema"
+    ].get("properties", {})
 
 
 def test_frontend_preconditions_use_only_declared_generic_evaluators():
@@ -235,63 +247,100 @@ def test_recent_transactions_limit_is_bounded_and_strict():
         validate_capability_input("banking.transactions.recent", {"limit": True})
 
 
-
 def test_contacts_search_contract_is_read_only_and_returns_only_resolution_fields():
     contract = get_capability("banking.contacts.search")
     assert contract["kind"] == "mcp"
     assert contract["execution"]["effect"] == "read_only"
     assert contract["authorization"]["agent_invocable"] is True
     assert contract["authorization"]["required_capability"] == "contacts:read"
-    assert validate_capability_input("banking.contacts.search", {"name_query": "John"})["name_query"] == "John"
+    assert (
+        validate_capability_input("banking.contacts.search", {"name_query": "John"})["name_query"]
+        == "John"
+    )
     with pytest.raises(ContractViolation):
-        validate_capability_input("banking.contacts.search", {"name_query": "John", "customer_id": "forged"})
+        validate_capability_input(
+            "banking.contacts.search", {"name_query": "John", "customer_id": "forged"}
+        )
     contact = {
-        "contact_id": "ct-12345678", "full_name": "John Carter", "bank_name": "Northstar Bank",
-        "account_reference_masked": "DEMO ···· 1042", "currency": "EUR", "status": "ACTIVE",
+        "contact_id": "ct-12345678",
+        "full_name": "John Carter",
+        "bank_name": "Northstar Bank",
+        "account_reference_masked": "DEMO ···· 1042",
+        "currency": "EUR",
+        "status": "ACTIVE",
     }
     assert validate_capability_output("banking.contacts.search", [contact]) == [contact]
     with pytest.raises(ContractViolation):
-        validate_capability_output("banking.contacts.search", [{**contact, "email": "john@example.test"}])
+        validate_capability_output(
+            "banking.contacts.search", [{**contact, "email": "john@example.test"}]
+        )
 
 
 def test_transfer_draft_requires_a_resolved_contact_identifier():
     valid = {
-        "beneficiary": "John Carter", "amount": "50.00", "currency": "EUR",
-        "from_account_id": "acc-001", "beneficiary_contact_id": "ct-12345678",
-        "workflow_id": "trf-test-12345678", "action_id": "act-test-12345678",
+        "beneficiary": "John Carter",
+        "amount": "50.00",
+        "currency": "EUR",
+        "from_account_id": "acc-001",
+        "beneficiary_contact_id": "ct-12345678",
+        "workflow_id": "trf-test-12345678",
+        "action_id": "act-test-12345678",
     }
     assert validate_capability_input("frontend.transfer.prepare_draft", valid) == valid
     with pytest.raises(ContractViolation):
-        validate_capability_input("frontend.transfer.prepare_draft", {key: value for key, value in valid.items() if key != "beneficiary_contact_id"})
+        validate_capability_input(
+            "frontend.transfer.prepare_draft",
+            {key: value for key, value in valid.items() if key != "beneficiary_contact_id"},
+        )
 
 
 def test_application_context_rejects_duplicate_contact_ids():
     contact = {"contact_id": "ct-12345678", "full_name": "John Carter", "status": "ACTIVE"}
     context = {
         "agent_turn_contract_version": "1.1.0",
-        "workspace": "Contacts", "selected_account_id": None, "selected_account_name": "All accounts",
-        "accounts": [], "contacts": [contact, contact],
+        "workspace": "Contacts",
+        "selected_account_id": None,
+        "selected_account_name": "All accounts",
+        "accounts": [],
+        "contacts": [contact, contact],
     }
     with pytest.raises(ContractViolation, match="unique_contact_identifiers"):
         validate_application_context(context)
 
+
 def test_recent_transaction_output_requires_verified_typed_records():
-    valid = [{
-        "transaction_id": "txn-1", "account_name": "Everyday account",
-        "description": "Coffee", "category": "Dining", "amount_minor": -485,
-        "currency": "EUR", "status": "BOOKED", "occurred_at": None,
-    }]
+    valid = [
+        {
+            "transaction_id": "txn-1",
+            "account_name": "Everyday account",
+            "description": "Coffee",
+            "category": "Dining",
+            "amount_minor": -485,
+            "currency": "EUR",
+            "status": "BOOKED",
+            "occurred_at": None,
+        }
+    ]
     assert validate_capability_output("banking.transactions.recent", valid) == valid
     with pytest.raises(ContractViolation):
-        validate_capability_output("banking.transactions.recent", [{**valid[0], "amount_minor": "-485"}])
+        validate_capability_output(
+            "banking.transactions.recent", [{**valid[0], "amount_minor": "-485"}]
+        )
 
 
 def test_success_envelope_carries_provenance_and_validated_data():
-    payload = [{
-        "transaction_id": "txn-1", "account_name": "Everyday account",
-        "description": "Coffee", "category": None, "amount_minor": -485,
-        "currency": "EUR", "status": "BOOKED", "occurred_at": None,
-    }]
+    payload = [
+        {
+            "transaction_id": "txn-1",
+            "account_name": "Everyday account",
+            "description": "Coffee",
+            "category": None,
+            "amount_minor": -485,
+            "currency": "EUR",
+            "status": "BOOKED",
+            "occurred_at": None,
+        }
+    ]
     envelope = create_result_envelope(
         "banking.transactions.recent", "SUCCESS", data=payload, trace_id="trace-123"
     )
@@ -302,7 +351,9 @@ def test_success_envelope_carries_provenance_and_validated_data():
 
 
 def test_empty_success_is_distinct_from_failure():
-    empty = create_result_envelope("banking.transactions.recent", "EMPTY", data=[], trace_id="trace-empty")
+    empty = create_result_envelope(
+        "banking.transactions.recent", "EMPTY", data=[], trace_id="trace-empty"
+    )
     assert empty["outcome"] == "EMPTY"
     assert empty["data"] == []
     assert empty["evidence"]["completeness"] == "EMPTY"
@@ -311,7 +362,8 @@ def test_empty_success_is_distinct_from_failure():
 
 def test_failure_envelope_has_no_data_or_evidence():
     failure = create_result_envelope(
-        "banking.transactions.recent", "UNAVAILABLE",
+        "banking.transactions.recent",
+        "UNAVAILABLE",
         error={"code": "BANKING_DATA_UNAVAILABLE", "retryable": True},
         trace_id="trace-fail",
     )
@@ -328,13 +380,18 @@ def test_result_envelope_rejects_capability_substitution():
 
 def test_presentation_contract_rejects_model_invented_rows_and_titles():
     evidence = {
-        "source": "mcp", "scope": "authenticated_customer_transactions",
-        "retrieved_at": "2026-11-21T00:00:00+00:00", "completeness": "COMPLETE", "trace_id": "t1",
+        "source": "mcp",
+        "scope": "authenticated_customer_transactions",
+        "retrieved_at": "2026-11-21T00:00:00+00:00",
+        "completeness": "COMPLETE",
+        "trace_id": "t1",
     }
     props = {"title": "Recent activity", "transactions": [], "evidence": evidence}
     assert validate_presentation_props("render_transaction_list", props) == props
     with pytest.raises(ContractViolation):
-        validate_presentation_props("render_transaction_list", {**props, "transactions": [{"fake": 1}]})
+        validate_presentation_props(
+            "render_transaction_list", {**props, "transactions": [{"fake": 1}]}
+        )
 
 
 def test_kernel_operations_are_explicitly_not_agent_callable():
@@ -348,16 +405,26 @@ def test_kernel_operations_are_explicitly_not_agent_callable():
 def test_generated_frontend_contracts_match_canonical_registry():
     result = subprocess.run(
         [sys.executable, "scripts/generate_contracts.py", "--check"],
-        cwd=ROOT, capture_output=True, text=True,
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
     )
     assert result.returncode == 0, result.stdout + result.stderr
 
 
 def test_result_envelope_rejects_outcome_data_and_evidence_mismatches():
-    transactions = [{
-        "transaction_id": "txn-1", "account_name": "Everyday account", "description": "Coffee",
-        "category": None, "amount_minor": -485, "currency": "EUR", "status": "BOOKED", "occurred_at": None,
-    }]
+    transactions = [
+        {
+            "transaction_id": "txn-1",
+            "account_name": "Everyday account",
+            "description": "Coffee",
+            "category": None,
+            "amount_minor": -485,
+            "currency": "EUR",
+            "status": "BOOKED",
+            "occurred_at": None,
+        }
+    ]
     with pytest.raises(ContractViolation):
         create_result_envelope("banking.transactions.recent", "EMPTY", data=transactions)
     with pytest.raises(ContractViolation):
@@ -385,7 +452,9 @@ def test_registry_rejects_unknown_context_semantic_rules_and_frontend_preconditi
         validate_registry_consistency(registry)
 
     registry = copy.deepcopy(get_registry())
-    registry["capabilities"]["frontend.account.select"]["preconditions"][0]["argument"] = "unknown_field"
+    registry["capabilities"]["frontend.account.select"]["preconditions"][0][
+        "argument"
+    ] = "unknown_field"
     with pytest.raises(RuntimeError, match="undeclared input argument"):
         validate_registry_consistency(registry)
 
@@ -394,7 +463,9 @@ def test_registry_rejects_unknown_references_and_agent_callable_kernel_operation
     import copy
 
     registry = copy.deepcopy(get_registry())
-    registry["presentations"]["render_transaction_list"]["binding"]["source_capabilities"] = ["banking.transactions.missing"]
+    registry["presentations"]["render_transaction_list"]["binding"]["source_capabilities"] = [
+        "banking.transactions.missing"
+    ]
     with pytest.raises(RuntimeError, match="unknown source capability"):
         validate_registry_consistency(registry)
 
@@ -450,20 +521,27 @@ def test_0_6_4_registry_has_versioned_workspace_academy_and_turn_outcome_contrac
     assert policy["turn_outcome_contract_version"] == "1.2.0"
     assert set(policy["workspaces"]) == set(policy["navigation"]["pages"])
     assert {"Loans", "Academy", "Payments", "Controls & audit"} <= set(policy["workspaces"])
-    assert len({topic["topic_id"] for topic in policy["academy_topics"]}) == len(policy["academy_topics"])
+    assert len({topic["topic_id"] for topic in policy["academy_topics"]}) == len(
+        policy["academy_topics"]
+    )
     assert all(topic.get("keywords") for topic in policy["academy_topics"])
-    validate_schema("turn_outcome", "schema", registry["turn_outcome_schema"], {
-        "schema_version": "1.2.0",
-        "turn_id": "turn-1",
-        "trace_ids": [],
-        "outcome": "RESPONSE_ONLY",
-        "successful_capabilities": [],
-        "partial_or_empty_capabilities": [],
-        "failed_capabilities": [],
-        "successful_frontend_actions": [],
-        "failed_frontend_actions": [],
-        "task_outcomes": [],
-    })
+    validate_schema(
+        "turn_outcome",
+        "schema",
+        registry["turn_outcome_schema"],
+        {
+            "schema_version": "1.2.0",
+            "turn_id": "turn-1",
+            "trace_ids": [],
+            "outcome": "RESPONSE_ONLY",
+            "successful_capabilities": [],
+            "partial_or_empty_capabilities": [],
+            "failed_capabilities": [],
+            "successful_frontend_actions": [],
+            "failed_frontend_actions": [],
+            "task_outcomes": [],
+        },
+    )
 
 
 def test_application_context_rejects_mismatched_agent_turn_contract_version():
@@ -479,7 +557,6 @@ def test_application_context_rejects_mismatched_agent_turn_contract_version():
         validate_application_context(context)
 
 
-
 def test_transaction_analysis_capability_is_read_only_scoped_and_strict():
     capability = get_capability("banking.transactions.analyze")
     assert capability["name"] == "analyze_customer_transactions"
@@ -488,15 +565,22 @@ def test_transaction_analysis_capability_is_read_only_scoped_and_strict():
     assert capability["execution"]["effect"] == "read_only"
     assert capability["evidence"]["scope"] == "authenticated_customer_transactions"
     request = {
-        "period": "this_month", "flow": "outflows", "merchant_query": "coffee",
-        "measure": "sum", "group_by": "none", "analysis_mode": "activity",
-        "include_transfers": False, "limit": 50,
+        "period": "this_month",
+        "flow": "outflows",
+        "merchant_query": "coffee",
+        "measure": "sum",
+        "group_by": "none",
+        "analysis_mode": "activity",
+        "include_transfers": False,
+        "limit": 50,
     }
     assert validate_capability_input("banking.transactions.analyze", request) == request
     with pytest.raises(ContractViolation):
         validate_capability_input("banking.transactions.analyze", {**request, "owner_id": "forged"})
     with pytest.raises(ContractViolation):
-        validate_capability_input("banking.transactions.analyze", {**request, "group_by": "arbitrary_sql"})
+        validate_capability_input(
+            "banking.transactions.analyze", {**request, "group_by": "arbitrary_sql"}
+        )
     with pytest.raises(ContractViolation):
         validate_capability_input("banking.transactions.analyze", {**request, "period": "2026-11"})
 
@@ -505,15 +589,41 @@ def test_transaction_analysis_result_preserves_currency_and_aggregation_evidence
     from shared.contracts.registry import validate_capability_output
 
     payload = {
-        "period": "this_month", "period_start": "2026-11-01", "period_end": "2026-11-24",
-        "business_timezone": "Europe/Prague", "flow": "outflows", "analysis_mode": "activity",
-        "measure": "sum", "group_by": "merchant", "include_transfers": False,
-        "transaction_count": 2, "truncated": False,
-        "summary_by_currency": [{"currency": "EUR", "transaction_count": 2, "sum_minor": 970, "average_minor": 485}],
-        "groups": [{"group_value": "Blue Bottle Coffee", "currency": "EUR", "transaction_count": 2,
-                    "sum_minor": 970, "average_minor": 485, "active_months": 1, "potentially_recurring": False}],
+        "period": "this_month",
+        "period_start": "2026-11-01",
+        "period_end": "2026-11-24",
+        "business_timezone": "Europe/Prague",
+        "flow": "outflows",
+        "analysis_mode": "activity",
+        "measure": "sum",
+        "group_by": "merchant",
+        "include_transfers": False,
+        "transaction_count": 2,
+        "truncated": False,
+        "summary_by_currency": [
+            {"currency": "EUR", "transaction_count": 2, "sum_minor": 970, "average_minor": 485}
+        ],
+        "groups": [
+            {
+                "group_value": "Blue Bottle Coffee",
+                "currency": "EUR",
+                "transaction_count": 2,
+                "sum_minor": 970,
+                "average_minor": 485,
+                "active_months": 1,
+                "potentially_recurring": False,
+            }
+        ],
         "transactions": [],
     }
     assert validate_capability_output("banking.transactions.analyze", payload) == payload
     with pytest.raises(ContractViolation):
-        validate_capability_output("banking.transactions.analyze", {**payload, "summary_by_currency": [{**payload["summary_by_currency"][0], "currency": "EUR+USD"}]})
+        validate_capability_output(
+            "banking.transactions.analyze",
+            {
+                **payload,
+                "summary_by_currency": [
+                    {**payload["summary_by_currency"][0], "currency": "EUR+USD"}
+                ],
+            },
+        )

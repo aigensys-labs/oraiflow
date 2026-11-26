@@ -3,6 +3,7 @@
 The JSON policy owns route order and handling strategy. OCCF remains the only
 source of truth for intent/capability schemas, resources and authority limits.
 """
+
 from __future__ import annotations
 
 from typing import Any
@@ -37,7 +38,9 @@ def classify_intent_task_class(
     response_mode = str(plan.get("response_mode", ""))
     if plan.get("resource_id") or response_mode in {"registered_catalogue", "registered_resource"}:
         return "resource"
-    if response_mode in {"editable_transfer_draft", "registered_workflow"} or plan.get("workflow_id"):
+    if response_mode in {"editable_transfer_draft", "registered_workflow"} or plan.get(
+        "workflow_id"
+    ):
         return "workflow"
     if plan.get("presentation"):
         return "presentation"
@@ -72,24 +75,29 @@ def _capability_catalogue(registry: dict[str, Any]) -> list[dict[str, Any]]:
         if kind == "mcp" and effect not in {"read", "read_only"}:
             # No writable MCP capability is ever advertised to the interpreter.
             continue
-        result.append({
-            "capability_id": str(capability_id),
-            "name": str(capability.get("name", "")),
-            "kind": kind,
-            "purpose": str(capability.get("description", ""))[:240],
-            "effect": effect,
-            "required_inputs": list(schema.get("required", [])) if isinstance(schema, dict) else [],
-            "available_inputs": {
-                str(key): str(value.get("description") or value.get("title") or key)[:100]
-                for key, value in properties.items() if isinstance(value, dict)
-            },
-            "serves_intents": sorted(uses.get(str(capability_id), [])),
-            "execution_boundary": (
-                "Authenticated read; runtime maps intent and validates arguments; MCP checks customer scope."
-                if kind == "mcp" else
-                "Registered UI-state action; runtime validates context and browser receipt."
-            ),
-        })
+        result.append(
+            {
+                "capability_id": str(capability_id),
+                "name": str(capability.get("name", "")),
+                "kind": kind,
+                "purpose": str(capability.get("description", ""))[:240],
+                "effect": effect,
+                "required_inputs": (
+                    list(schema.get("required", [])) if isinstance(schema, dict) else []
+                ),
+                "available_inputs": {
+                    str(key): str(value.get("description") or value.get("title") or key)[:100]
+                    for key, value in properties.items()
+                    if isinstance(value, dict)
+                },
+                "serves_intents": sorted(uses.get(str(capability_id), [])),
+                "execution_boundary": (
+                    "Authenticated read; runtime maps intent and validates arguments; MCP checks customer scope."
+                    if kind == "mcp"
+                    else "Registered UI-state action; runtime validates context and browser receipt."
+                ),
+            }
+        )
     return result
 
 
@@ -129,14 +137,20 @@ def build_agent_decision_map(
             "task_class": task_class,
             "execution_owner": dispatch.handler if dispatch else "explain_supported_scope",
             "resource_id": item.get("resource_id"),
-            "required_slots": [value for value in item["required_slots"] if value not in semantic_fields],
-            "optional_slots": [value for value in item["optional_slots"] if value not in semantic_fields],
+            "required_slots": [
+                value for value in item["required_slots"] if value not in semantic_fields
+            ],
+            "optional_slots": [
+                value for value in item["optional_slots"] if value not in semantic_fields
+            ],
             "slot_descriptions": {
-                key: value for key, value in item["slot_descriptions"].items()
+                key: value
+                for key, value in item["slot_descriptions"].items()
                 if key not in semantic_fields
             },
             "slot_values": {
-                key: value for key, value in item["slot_values"].items()
+                key: value
+                for key, value in item["slot_values"].items()
                 if key not in semantic_fields
             },
             "required_entities": item["required_entities"],
@@ -153,13 +167,15 @@ def build_agent_decision_map(
 
     capability_catalogue = []
     for item in _capability_catalogue(registry):
-        capability_catalogue.append({
-            "capability_id": item["capability_id"],
-            "kind": item["kind"],
-            "effect": item["effect"],
-            "required_inputs": item["required_inputs"],
-            "serves_intents": item["serves_intents"],
-        })
+        capability_catalogue.append(
+            {
+                "capability_id": item["capability_id"],
+                "kind": item["kind"],
+                "effect": item["effect"],
+                "required_inputs": item["required_inputs"],
+                "serves_intents": item["serves_intents"],
+            }
+        )
 
     workspaces = application.get("workspaces", {})
     workspace_items = [
@@ -167,18 +183,21 @@ def build_agent_decision_map(
             "workspace_id": str(workspace_id),
             "purpose": str(value.get("purpose", ""))[:105],
         }
-        for workspace_id, value in workspaces.items() if isinstance(value, dict)
+        for workspace_id, value in workspaces.items()
+        if isinstance(value, dict)
     ]
     academy_topics = []
     for topic in application.get("academy_topics", []):
         if not isinstance(topic, dict):
             continue
-        academy_topics.append({
-            "topic_id": str(topic.get("topic_id", "")),
-            "title": str(topic.get("title", "")),
-            "purpose": str(topic.get("description", ""))[:105],
-            "personal_data_intent_id": topic.get("personal_data_intent_id"),
-        })
+        academy_topics.append(
+            {
+                "topic_id": str(topic.get("topic_id", "")),
+                "title": str(topic.get("title", "")),
+                "purpose": str(topic.get("description", ""))[:105],
+                "personal_data_intent_id": topic.get("personal_data_intent_id"),
+            }
+        )
 
     assistant_capabilities = [
         {
@@ -188,19 +207,23 @@ def build_agent_decision_map(
             "intent_ids": list(item.get("intent_ids", [])),
             "topic_ids": list(item.get("topic_ids", [])),
         }
-        for item in application.get("assistant_capabilities", []) if isinstance(item, dict)
+        for item in application.get("assistant_capabilities", [])
+        if isinstance(item, dict)
     ]
-
-
 
     # Fail fast on policy/registry drift instead of silently advertising a
     # route that has no registered owner or references a missing resource.
     resource_ids = {"academy_topics", "workspace_catalogue", "assistant_capabilities"}
     for route in policy.pre_assessment_routes:
         if route.handler not in {
-            "academy_personal_read", "workspace_navigation", "workspace_knowledge",
-            "academy_education", "connector_failure", "canonical_read",
-            "assistant_capabilities", "simple_social",
+            "academy_personal_read",
+            "workspace_navigation",
+            "workspace_knowledge",
+            "academy_education",
+            "connector_failure",
+            "canonical_read",
+            "assistant_capabilities",
+            "simple_social",
         }:
             raise ValueError(f"Decision policy route has no runtime owner: {route.handler}")
     for intent in intents:
@@ -216,8 +239,12 @@ def build_agent_decision_map(
             "policy_id": policy.policy_id,
             "revision": policy.revision,
             "pre_assessment_routes": [
-                {"id": route.id, "priority": route.priority, "handler": route.handler,
-                 "purpose": route.purpose[:110]}
+                {
+                    "id": route.id,
+                    "priority": route.priority,
+                    "handler": route.handler,
+                    "purpose": route.purpose[:110],
+                }
                 for route in ordered_pre_assessment_routes(policy)
             ],
             "task_dispatch": {
@@ -271,11 +298,11 @@ def pre_assessment_routes(policy: DecisionRoutingPolicy | None = None):
     return ordered_pre_assessment_routes(policy)
 
 
-
 def decision_policy_identity(policy: DecisionRoutingPolicy | None = None) -> dict[str, Any]:
     """Return non-sensitive policy identity for structured turn observability."""
     policy = policy or load_decision_routing_policy()
     return {"policy_id": policy.policy_id, "revision": policy.revision}
+
 
 def render_registered_resource_response(
     resource_id: str,
@@ -286,12 +313,15 @@ def render_registered_resource_response(
     references = references if isinstance(references, dict) else {}
     if resource_id == "academy_topics":
         from services.agent_runtime.academy import academy_catalogue_explanation
+
         topic_ids = references.get("topic_ids")
         if not isinstance(topic_ids, list):
             topic_id = references.get("topic_id")
             topic_ids = [topic_id] if topic_id else None
         result = academy_catalogue_explanation(
-            current_text, topic_ids=topic_ids, require_customer_explanation=False,
+            current_text,
+            topic_ids=topic_ids,
+            require_customer_explanation=False,
         )
         if result:
             return result
@@ -299,7 +329,11 @@ def render_registered_resource_response(
         # catalogue; do not turn an unmatched keyword into an out-of-scope task.
         registry = get_registry()
         topics = registry.get("application_policy", {}).get("academy_topics", [])
-        titles = [str(item.get("title", "")) for item in topics if isinstance(item, dict) and item.get("title")]
+        titles = [
+            str(item.get("title", ""))
+            for item in topics
+            if isinstance(item, dict) and item.get("title")
+        ]
         if titles:
             return (
                 "**Academy**\nA guided financial-literacy workspace where you can learn about "
@@ -310,12 +344,21 @@ def render_registered_resource_response(
 
     if resource_id == "workspace_catalogue":
         from services.agent_runtime.workspace_knowledge import (
-            workspace_catalogue_overview_message, workspace_explanation_message,
+            workspace_catalogue_overview_message,
+            workspace_explanation_message,
         )
+
         workspace = references.get("workspace")
-        return workspace_explanation_message(str(workspace)) if workspace else workspace_catalogue_overview_message()
+        return (
+            workspace_explanation_message(str(workspace))
+            if workspace
+            else workspace_catalogue_overview_message()
+        )
 
     if resource_id == "assistant_capabilities":
-        from services.agent_runtime.assistant_capabilities import assistant_capability_catalogue_message
+        from services.agent_runtime.assistant_capabilities import (
+            assistant_capability_catalogue_message,
+        )
+
         return assistant_capability_catalogue_message()
     return None

@@ -23,7 +23,12 @@ from shared.version import __version__
 from shared.identity import current_demo_identity, require_capability
 from shared.financial_health import calculate_recorded_financial_health
 from shared.demo_configuration import demo_loan_enabled
-from shared.contracts.registry import create_result_envelope, get_capability, validate_capability_input, validate_capability_output
+from shared.contracts.registry import (
+    create_result_envelope,
+    get_capability,
+    validate_capability_input,
+    validate_capability_output,
+)
 
 MCP_ACCESS_TOKEN = os.getenv("MCP_ACCESS_TOKEN", "local-mcp-token-change-me")
 _mcp_trace_id: ContextVar[str] = ContextVar("oraiflow_mcp_trace_id", default="-")
@@ -39,12 +44,16 @@ def _require_mcp_capability(capability_id: str):
     return identity
 
 
-def _validated_tool_result(capability_id: str, payload: dict, data, *, outcome: str | None = None) -> str:
+def _validated_tool_result(
+    capability_id: str, payload: dict, data, *, outcome: str | None = None
+) -> str:
     """Return a validated common result envelope from the MCP boundary."""
     validate_capability_input(capability_id, payload)
     json_data = jsonable_encoder(data)
     validate_capability_output(capability_id, json_data)
-    outcome = outcome or ("EMPTY" if isinstance(json_data, (list, dict)) and not json_data else "SUCCESS")
+    outcome = outcome or (
+        "EMPTY" if isinstance(json_data, (list, dict)) and not json_data else "SUCCESS"
+    )
     trace_id = _mcp_trace_id.get()
     if not trace_id or trace_id == "-":
         trace_id = f"mcp-{uuid.uuid4().hex[:20]}"
@@ -62,9 +71,12 @@ def _rejected_tool_result(capability_id: str, code: str) -> str:
         capability_id,
         "REJECTED",
         error={"code": code, "retryable": False},
-        trace_id=_mcp_trace_id.get() if _mcp_trace_id.get() != "-" else f"mcp-{uuid.uuid4().hex[:20]}",
+        trace_id=(
+            _mcp_trace_id.get() if _mcp_trace_id.get() != "-" else f"mcp-{uuid.uuid4().hex[:20]}"
+        ),
     )
     return json.dumps(envelope, ensure_ascii=False, separators=(",", ":"))
+
 
 mcp = FastMCP(
     "ORAIflow Banking Capabilities",
@@ -86,14 +98,18 @@ def list_customer_accounts() -> str:
     except PermissionError:
         return _rejected_tool_result("banking.accounts.list", "CAPABILITY_NOT_PERMITTED")
     with get_mcp_engine().connect() as conn:
-        rows = conn.execute(
-            text("""
+        rows = (
+            conn.execute(
+                text("""
                 SELECT account_id, account_name, account_type,
                        currency, balance_minor, status
                 FROM accounts WHERE owner_id = :owner AND tenant_id = :tenant ORDER BY account_name
             """),
-            {"owner": identity.subject, "tenant": identity.tenant_id},
-        ).mappings().all()
+                {"owner": identity.subject, "tenant": identity.tenant_id},
+            )
+            .mappings()
+            .all()
+        )
     data = [dict(row) for row in rows]
     return _validated_tool_result("banking.accounts.list", {}, data)
 
@@ -108,13 +124,17 @@ def get_account_balance(account_id: str) -> str:
     except PermissionError:
         return _rejected_tool_result("banking.accounts.balance", "CAPABILITY_NOT_PERMITTED")
     with get_mcp_engine().connect() as conn:
-        row = conn.execute(
-            text("""
+        row = (
+            conn.execute(
+                text("""
                 SELECT account_id, account_name, currency, balance_minor, status
                 FROM accounts WHERE account_id = :account AND owner_id = :owner AND tenant_id = :tenant
             """),
-            {"account": account_id, "owner": identity.subject, "tenant": identity.tenant_id},
-        ).mappings().first()
+                {"account": account_id, "owner": identity.subject, "tenant": identity.tenant_id},
+            )
+            .mappings()
+            .first()
+        )
     if not row:
         # An inaccessible account is not an empty or zero-balance success.
         return _rejected_tool_result("banking.accounts.balance", "ACCOUNT_NOT_ACCESSIBLE")
@@ -132,8 +152,9 @@ def get_recent_transactions(limit: int = 5) -> str:
         return _rejected_tool_result("banking.transactions.recent", "CAPABILITY_NOT_PERMITTED")
     safe_limit = int(limit)
     with get_mcp_engine().connect() as conn:
-        rows = conn.execute(
-            text("""
+        rows = (
+            conn.execute(
+                text("""
                 SELECT t.transaction_id, a.account_name, t.description, t.category,
                        t.amount_minor, t.currency, t.status, t.occurred_at
                 FROM transactions t
@@ -142,14 +163,25 @@ def get_recent_transactions(limit: int = 5) -> str:
                 ORDER BY t.occurred_at DESC
                 LIMIT :limit
             """),
-            {"owner": identity.subject, "tenant": identity.tenant_id, "limit": safe_limit},
-        ).mappings().all()
-    return _validated_tool_result("banking.transactions.recent", request, [dict(row) for row in rows])
+                {"owner": identity.subject, "tenant": identity.tenant_id, "limit": safe_limit},
+            )
+            .mappings()
+            .all()
+        )
+    return _validated_tool_result(
+        "banking.transactions.recent", request, [dict(row) for row in rows]
+    )
 
 
 _TRANSACTION_ANALYSIS_PERIODS = {
-    "last_7_days", "last_30_days", "last_90_days", "last_365_days",
-    "this_month", "last_month", "year_to_date", "all_available",
+    "last_7_days",
+    "last_30_days",
+    "last_90_days",
+    "last_365_days",
+    "this_month",
+    "last_month",
+    "year_to_date",
+    "all_available",
 }
 _TRANSACTION_ANALYSIS_GROUPS = {"none", "merchant", "category", "account", "month"}
 _TRANSACTION_ANALYSIS_FLOWS = {"all", "inflows", "outflows"}
@@ -202,7 +234,13 @@ def _transaction_analysis_period_bounds(
 
     start_at = datetime.combine(start_day, time.min, tzinfo=zone)
     end_at = datetime.combine(end_day, time.min, tzinfo=zone)
-    return start_at, end_at, start_day.isoformat(), (end_day - timedelta(days=1)).isoformat(), zone_name
+    return (
+        start_at,
+        end_at,
+        start_day.isoformat(),
+        (end_day - timedelta(days=1)).isoformat(),
+        zone_name,
+    )
 
 
 @mcp.tool()
@@ -233,8 +271,11 @@ def analyze_customer_transactions(
         "limit": limit,
     }
     for key, value in (
-        ("period", period), ("flow", flow), ("merchant_query", merchant_query),
-        ("category_query", category_query), ("account_name_query", account_name_query),
+        ("period", period),
+        ("flow", flow),
+        ("merchant_query", merchant_query),
+        ("category_query", category_query),
+        ("account_name_query", account_name_query),
     ):
         if value is not None:
             request[key] = str(value).strip()
@@ -245,20 +286,28 @@ def analyze_customer_transactions(
     except PermissionError:
         return _rejected_tool_result("banking.transactions.analyze", "CAPABILITY_NOT_PERMITTED")
 
-    effective_period = period or ("last_365_days" if analysis_mode == "recurring_inflows" else "last_30_days")
+    effective_period = period or (
+        "last_365_days" if analysis_mode == "recurring_inflows" else "last_30_days"
+    )
     effective_flow = flow or ("inflows" if analysis_mode == "recurring_inflows" else "all")
     effective_group_by = group_by
     if analysis_mode == "recurring_inflows":
         if flow == "outflows":
-            return _rejected_tool_result("banking.transactions.analyze", "INCOMPATIBLE_ANALYSIS_FILTERS")
+            return _rejected_tool_result(
+                "banking.transactions.analyze", "INCOMPATIBLE_ANALYSIS_FILTERS"
+            )
         effective_flow = "inflows"
         if group_by == "none":
             effective_group_by = "merchant"
 
     try:
-        start_at, end_at, start_date, end_date, timezone_name = _transaction_analysis_period_bounds(effective_period)
+        start_at, end_at, start_date, end_date, timezone_name = _transaction_analysis_period_bounds(
+            effective_period
+        )
     except ValueError:
-        return _rejected_tool_result("banking.transactions.analyze", "INVALID_BUSINESS_TIMEZONE_OR_PERIOD")
+        return _rejected_tool_result(
+            "banking.transactions.analyze", "INVALID_BUSINESS_TIMEZONE_OR_PERIOD"
+        )
 
     predicates = [
         "a.owner_id = :owner",
@@ -298,7 +347,9 @@ def analyze_customer_transactions(
         params["account_name_query"] = account_name_query.casefold()
 
     where_sql = " AND ".join(predicates)
-    amount_expression = "ABS(t.amount_minor)" if effective_flow in {"inflows", "outflows"} else "t.amount_minor"
+    amount_expression = (
+        "ABS(t.amount_minor)" if effective_flow in {"inflows", "outflows"} else "t.amount_minor"
+    )
     summary_sql = f"""
         SELECT t.currency,
                COUNT(*)::BIGINT AS transaction_count,
@@ -330,7 +381,11 @@ def analyze_customer_transactions(
         if effective_group_by not in group_specs:
             return _rejected_tool_result("banking.transactions.analyze", "UNSUPPORTED_GROUPING")
         group_key, group_label = group_specs[effective_group_by]
-        group_order = "group_value ASC" if effective_group_by == "month" else "transaction_count DESC, group_value ASC"
+        group_order = (
+            "group_value ASC"
+            if effective_group_by == "month"
+            else "transaction_count DESC, group_value ASC"
+        )
         group_sql = f"""
             SELECT {group_label} AS group_value, t.currency,
                    COUNT(*)::BIGINT AS transaction_count,
@@ -364,39 +419,52 @@ def analyze_customer_transactions(
             detail_params = {**params, "detail_limit": min(int(limit), 100) + 1}
             detail_rows = conn.execute(text(detail_sql), detail_params).mappings().all()
             details_truncated = len(detail_rows) > int(limit)
-            detail_rows = detail_rows[:int(limit)]
+            detail_rows = detail_rows[: int(limit)]
 
-    summary = [{
-        "currency": str(row["currency"]).upper(),
-        "transaction_count": int(row["transaction_count"]),
-        "sum_minor": int(row["sum_minor"]),
-        "average_minor": int(row["average_minor"]),
-    } for row in summary_rows]
+    summary = [
+        {
+            "currency": str(row["currency"]).upper(),
+            "transaction_count": int(row["transaction_count"]),
+            "sum_minor": int(row["sum_minor"]),
+            "average_minor": int(row["average_minor"]),
+        }
+        for row in summary_rows
+    ]
     total_count = sum(row["transaction_count"] for row in summary)
-    groups = [{
-        "group_value": str(row["group_value"] or "Unspecified")[:160],
-        "currency": str(row["currency"]).upper(),
-        "transaction_count": int(row["transaction_count"]),
-        "sum_minor": int(row["sum_minor"]),
-        "average_minor": int(row["average_minor"]),
-        "active_months": int(row["active_months"]),
-        "potentially_recurring": bool(
-            analysis_mode == "recurring_inflows"
-            and effective_group_by == "merchant"
-            and int(row["transaction_count"]) >= 3
-            and int(row["active_months"]) >= 3
-        ),
-    } for row in group_rows[:100]]
-    transaction_rows = [{
-        "transaction_id": str(row["transaction_id"]),
-        "account_name": str(row["account_name"]),
-        "description": str(row["description"]),
-        "category": row["category"],
-        "amount_minor": int(row["amount_minor"]),
-        "currency": str(row["currency"]).upper(),
-        "status": str(row["status"]),
-        "occurred_at": row["occurred_at"].isoformat() if hasattr(row["occurred_at"], "isoformat") else (str(row["occurred_at"]) if row["occurred_at"] is not None else None),
-    } for row in detail_rows]
+    groups = [
+        {
+            "group_value": str(row["group_value"] or "Unspecified")[:160],
+            "currency": str(row["currency"]).upper(),
+            "transaction_count": int(row["transaction_count"]),
+            "sum_minor": int(row["sum_minor"]),
+            "average_minor": int(row["average_minor"]),
+            "active_months": int(row["active_months"]),
+            "potentially_recurring": bool(
+                analysis_mode == "recurring_inflows"
+                and effective_group_by == "merchant"
+                and int(row["transaction_count"]) >= 3
+                and int(row["active_months"]) >= 3
+            ),
+        }
+        for row in group_rows[:100]
+    ]
+    transaction_rows = [
+        {
+            "transaction_id": str(row["transaction_id"]),
+            "account_name": str(row["account_name"]),
+            "description": str(row["description"]),
+            "category": row["category"],
+            "amount_minor": int(row["amount_minor"]),
+            "currency": str(row["currency"]).upper(),
+            "status": str(row["status"]),
+            "occurred_at": (
+                row["occurred_at"].isoformat()
+                if hasattr(row["occurred_at"], "isoformat")
+                else (str(row["occurred_at"]) if row["occurred_at"] is not None else None)
+            ),
+        }
+        for row in detail_rows
+    ]
 
     truncated = len(group_rows) > 100 or details_truncated
     data = {
@@ -435,7 +503,9 @@ def get_customer_loan_overview() -> str:
     if not demo_loan_enabled():
         return _validated_tool_result("banking.loans.overview", {}, {})
     with get_mcp_engine().connect() as conn:
-        loan = conn.execute(text("""
+        loan = (
+            conn.execute(
+                text("""
             SELECT loan_id, product_name, principal_minor, outstanding_principal_minor,
                    currency, annual_interest_rate_bps, term_months, monthly_payment_minor,
                    total_interest_minor, total_repayment_minor, disbursement_date,
@@ -443,15 +513,27 @@ def get_customer_loan_overview() -> str:
               FROM demo_loans
              WHERE owner_id=:owner AND tenant_id=:tenant AND demo_only=TRUE
              ORDER BY created_at DESC LIMIT 1
-        """), {"owner": identity.subject, "tenant": identity.tenant_id}).mappings().first()
+        """),
+                {"owner": identity.subject, "tenant": identity.tenant_id},
+            )
+            .mappings()
+            .first()
+        )
         if not loan:
             return _validated_tool_result("banking.loans.overview", {}, {})
-        installments = conn.execute(text("""
+        installments = (
+            conn.execute(
+                text("""
             SELECT installment_number, due_date, payment_minor, principal_minor,
                    interest_minor, status
               FROM demo_loan_installments
              WHERE loan_id=:loan_id ORDER BY installment_number
-        """), {"loan_id": loan["loan_id"]}).mappings().all()
+        """),
+                {"loan_id": loan["loan_id"]},
+            )
+            .mappings()
+            .all()
+        )
     data = {**dict(loan), "installments": [dict(item) for item in installments]}
     return _validated_tool_result("banking.loans.overview", {}, data)
 
@@ -467,23 +549,44 @@ def get_customer_financial_health_overview() -> str:
         require_capability(identity, "accounts:read")
         require_capability(identity, "loans:read")
     except PermissionError:
-        return _rejected_tool_result("banking.financial_health.overview", "CAPABILITY_NOT_PERMITTED")
+        return _rejected_tool_result(
+            "banking.financial_health.overview", "CAPABILITY_NOT_PERMITTED"
+        )
 
     with get_mcp_engine().connect() as conn:
-        account_rows = conn.execute(text("""
+        account_rows = (
+            conn.execute(
+                text("""
             SELECT currency, balance_minor, status
               FROM accounts
              WHERE owner_id=:owner AND tenant_id=:tenant
-        """), {"owner": identity.subject, "tenant": identity.tenant_id}).mappings().all()
-        loan_rows = conn.execute(text("""
+        """),
+                {"owner": identity.subject, "tenant": identity.tenant_id},
+            )
+            .mappings()
+            .all()
+        )
+        loan_rows = (
+            conn.execute(
+                text("""
             SELECT currency, outstanding_principal_minor, principal_minor, demo_only
               FROM demo_loans
              WHERE owner_id=:owner AND tenant_id=:tenant
                AND (demo_only=FALSE OR :include_demo=TRUE)
-        """), {"owner": identity.subject, "tenant": identity.tenant_id,
-              "include_demo": demo_loan_enabled()}).mappings().all()
+        """),
+                {
+                    "owner": identity.subject,
+                    "tenant": identity.tenant_id,
+                    "include_demo": demo_loan_enabled(),
+                },
+            )
+            .mappings()
+            .all()
+        )
 
-    data = calculate_recorded_financial_health(account_rows, loan_rows, include_demo_loans=demo_loan_enabled())
+    data = calculate_recorded_financial_health(
+        account_rows, loan_rows, include_demo_loans=demo_loan_enabled()
+    )
     return _validated_tool_result("banking.financial_health.overview", {}, data)
 
 
@@ -501,8 +604,9 @@ def search_contacts(name_query: str) -> str:
     # Exact, prefix and contained matches are returned with a deterministic rank.
     # The caller must resolve ambiguity; the MCP service never chooses a payee.
     with get_mcp_engine().connect() as conn:
-        rows = conn.execute(
-            text("""
+        rows = (
+            conn.execute(
+                text("""
                 SELECT contact_id, full_name, bank_name, account_reference_masked,
                        currency, status,
                        CASE WHEN normalized_name=:exact THEN 0
@@ -514,14 +618,17 @@ def search_contacts(name_query: str) -> str:
                  ORDER BY match_rank, normalized_name, contact_id
                  LIMIT 10
             """),
-            {
-                "exact": normalized,
-                "prefix": normalized + "%",
-                "contains": "%" + normalized + "%",
-                "owner": identity.subject,
-                "tenant": identity.tenant_id,
-            },
-        ).mappings().all()
+                {
+                    "exact": normalized,
+                    "prefix": normalized + "%",
+                    "contains": "%" + normalized + "%",
+                    "owner": identity.subject,
+                    "tenant": identity.tenant_id,
+                },
+            )
+            .mappings()
+            .all()
+        )
     data = [{key: value for key, value in row.items() if key != "match_rank"} for row in rows]
     return _validated_tool_result("banking.contacts.search", request, data)
 
@@ -548,7 +655,11 @@ async def local_bearer_guard(request: Request, call_next):
         if not hmac.compare_digest(supplied, expected):
             return JSONResponse({"error": "Unauthorized MCP client"}, status_code=401)
         supplied_trace = request.headers.get("x-orai-trace-id", "").strip()
-        trace_id = supplied_trace[:128] if supplied_trace and all(ch.isalnum() or ch in "-_" for ch in supplied_trace) else f"mcp-{uuid.uuid4().hex[:20]}"
+        trace_id = (
+            supplied_trace[:128]
+            if supplied_trace and all(ch.isalnum() or ch in "-_" for ch in supplied_trace)
+            else f"mcp-{uuid.uuid4().hex[:20]}"
+        )
         token = _mcp_trace_id.set(trace_id)
         try:
             return await call_next(request)
@@ -568,4 +679,5 @@ app.mount("/", mcp.streamable_http_app())
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run("services.mcp.main:app", host="0.0.0.0", port=int(os.getenv("MCP_PORT", "8100")))

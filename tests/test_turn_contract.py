@@ -16,7 +16,11 @@ def _tool_message(capability_id, outcome="SUCCESS"):
         outcome,
         data=data if outcome == "SUCCESS" else ({} if outcome == "EMPTY" else None),
         trace_id="trace-current",
-        error={"code": "UNAVAILABLE", "retryable": True} if outcome not in {"SUCCESS", "EMPTY"} else None,
+        error=(
+            {"code": "UNAVAILABLE", "retryable": True}
+            if outcome not in {"SUCCESS", "EMPTY"}
+            else None
+        ),
     )
     tool_name = get_registry()["capabilities"][capability_id]["name"]
     return SimpleNamespace(type="tool", name=tool_name, content=json.dumps(payload))
@@ -63,7 +67,9 @@ def test_turn_outcome_marks_malformed_mcp_result_as_failure_not_success():
 
 
 def _frontend_tool_message(capability_id, *, outcome="SUCCESS", status=None):
-    default_status = get_registry()["capabilities"][capability_id]["result_semantics"]["success_status"]
+    default_status = get_registry()["capabilities"][capability_id]["result_semantics"][
+        "success_status"
+    ]
     data = {"status": status or default_status}
     if capability_id == "frontend.workspace.navigate":
         data["workspace"] = "Academy"
@@ -129,7 +135,9 @@ def test_turn_outcome_does_not_accept_valid_envelope_with_wrong_action_status():
 
 def test_turn_outcome_treats_malformed_frontend_receipt_as_failure():
     name = get_registry()["capabilities"]["frontend.workspace.navigate"]["name"]
-    message = SimpleNamespace(type="tool", name=name, content='{"status":"opened","workspace":"Academy"}')
+    message = SimpleNamespace(
+        type="tool", name=name, content='{"status":"opened","workspace":"Academy"}'
+    )
     outcome = derive_turn_outcome(
         [SimpleNamespace(type="human", id="turn-action", content="open Academy"), message],
         fallback_turn_id="fallback",
@@ -143,7 +151,10 @@ def test_task_outcomes_correlate_browser_presentation_receipt_by_original_call_i
     mcp_name = registry["capabilities"]["banking.transactions.recent"]["name"]
     presentation_name = registry["presentations"]["render_transaction_list"]["name"]
     mcp_result = create_result_envelope(
-        "banking.transactions.recent", "EMPTY", data=[], trace_id="trace-transactions",
+        "banking.transactions.recent",
+        "EMPTY",
+        data=[],
+        trace_id="trace-transactions",
     )
     task_id = "task-transactions-001"
     plan_message = SimpleNamespace(
@@ -151,15 +162,17 @@ def test_task_outcomes_correlate_browser_presentation_receipt_by_original_call_i
         additional_kwargs={
             "oraiflow_task_plan": {
                 "schema_version": "1.0.0",
-                "tasks": [{
-                    "task_id": task_id,
-                    "intent_id": "RECENT_TRANSACTIONS",
-                    "status_hint": "PLANNED",
-                    "capability_ids": ["banking.transactions.recent"],
-                    "tool_call_ids": ["mcp-call-1", "presentation-call-1"],
-                    "presentation_id": "render_transaction_list",
-                    "presentation_name": presentation_name,
-                }],
+                "tasks": [
+                    {
+                        "task_id": task_id,
+                        "intent_id": "RECENT_TRANSACTIONS",
+                        "status_hint": "PLANNED",
+                        "capability_ids": ["banking.transactions.recent"],
+                        "tool_call_ids": ["mcp-call-1", "presentation-call-1"],
+                        "presentation_id": "render_transaction_list",
+                        "presentation_name": presentation_name,
+                    }
+                ],
             },
             "oraiflow_task_call_map": {
                 "mcp-call-1": [task_id],
@@ -171,14 +184,20 @@ def test_task_outcomes_correlate_browser_presentation_receipt_by_original_call_i
         SimpleNamespace(type="human", id="turn-1", content="my transactions"),
         plan_message,
         SimpleNamespace(
-            type="tool", name=mcp_name, tool_call_id="mcp-call-1",
-            content=json.dumps(mcp_result), additional_kwargs={},
+            type="tool",
+            name=mcp_name,
+            tool_call_id="mcp-call-1",
+            content=json.dumps(mcp_result),
+            additional_kwargs={},
         ),
         # Browser ToolMessages can omit Agent-specific metadata; tool_call_id
         # remains the stable correlation key.
         SimpleNamespace(
-            type="tool", name=presentation_name, tool_call_id="presentation-call-1",
-            content='{"status":"rendered"}', additional_kwargs={},
+            type="tool",
+            name=presentation_name,
+            tool_call_id="presentation-call-1",
+            content='{"status":"rendered"}',
+            additional_kwargs={},
         ),
     ]
     outcome = derive_turn_outcome(messages, fallback_turn_id="fallback")
@@ -196,20 +215,27 @@ def test_task_outcome_reports_presentation_only_success_by_tool_call_correlation
         SimpleNamespace(
             type="ai",
             additional_kwargs={
-                "oraiflow_task_plan": {"tasks": [{
-                    "task_id": task_id,
-                    "intent_id": "ACCOUNT_OVERVIEW",
-                    "status_hint": "PLANNED",
-                    "capability_ids": [],
-                    "tool_call_ids": ["render-call-1"],
-                    "presentation_name": presentation_name,
-                }]},
+                "oraiflow_task_plan": {
+                    "tasks": [
+                        {
+                            "task_id": task_id,
+                            "intent_id": "ACCOUNT_OVERVIEW",
+                            "status_hint": "PLANNED",
+                            "capability_ids": [],
+                            "tool_call_ids": ["render-call-1"],
+                            "presentation_name": presentation_name,
+                        }
+                    ]
+                },
                 "oraiflow_task_call_map": {"render-call-1": [task_id]},
             },
         ),
         SimpleNamespace(
-            type="tool", name=presentation_name, tool_call_id="render-call-1",
-            content='{"status":"rendered"}', additional_kwargs={},
+            type="tool",
+            name=presentation_name,
+            tool_call_id="render-call-1",
+            content='{"status":"rendered"}',
+            additional_kwargs={},
         ),
     ]
     outcome = derive_turn_outcome(messages, fallback_turn_id="fallback")

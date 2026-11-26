@@ -1,4 +1,5 @@
 """Transport helpers for keeping long-running AG-UI streams responsive."""
+
 from __future__ import annotations
 
 import asyncio
@@ -31,7 +32,9 @@ async def iter_with_keepalives(
             if pending is None:
                 pending = asyncio.create_task(iterator.__anext__())
             done, _ = await asyncio.wait(
-                {pending}, timeout=interval, return_when=asyncio.FIRST_COMPLETED,
+                {pending},
+                timeout=interval,
+                return_when=asyncio.FIRST_COMPLETED,
             )
             if not done:
                 yield None
@@ -64,7 +67,10 @@ def internal_model_run_config(phase: str) -> dict[str, Any]:
     validated graph-node messages may be published to the customer stream.
     """
     safe_phase = "".join(ch for ch in str(phase).lower() if ch.isalnum() or ch in "-_")[:40]
-    return {"callbacks": [], "tags": ["oraiflow-internal", f"oraiflow-phase:{safe_phase or 'model'}"]}
+    return {
+        "callbacks": [],
+        "tags": ["oraiflow-internal", f"oraiflow-phase:{safe_phase or 'model'}"],
+    }
 
 
 async def invoke_internal_model(model: Any, model_input: Any, *, phase: str) -> Any:
@@ -134,8 +140,7 @@ def _snapshot_assistant_candidate(
     candidates: list[tuple[str, str]] = []
     for index, message in enumerate(messages):
         role = str(
-            _event_value(message, "role", "")
-            or _event_value(message, "type", "")
+            _event_value(message, "role", "") or _event_value(message, "type", "")
         ).casefold()
         if role not in {"assistant", "ai"}:
             continue
@@ -164,10 +169,7 @@ def _normalise_stream_text(value: str) -> str:
 
 
 def _message_role(message: Any) -> str:
-    raw = str(
-        _event_value(message, "role", "")
-        or _event_value(message, "type", "")
-    ).casefold()
+    raw = str(_event_value(message, "role", "") or _event_value(message, "type", "")).casefold()
     return {"human": "user", "ai": "assistant", "function": "tool"}.get(raw, raw)
 
 
@@ -177,9 +179,13 @@ def _message_signature(message: Any) -> tuple[str, str, str] | None:
     if role not in {"user", "assistant", "tool", "system", "developer"}:
         return None
     content = _normalise_stream_text(_message_text(message))
-    tool_calls = _event_value(message, "tool_calls", None) or _event_value(message, "toolCalls", None) or []
+    tool_calls = (
+        _event_value(message, "tool_calls", None) or _event_value(message, "toolCalls", None) or []
+    )
     try:
-        calls = json.dumps(tool_calls, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str)
+        calls = json.dumps(
+            tool_calls, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str
+        )
     except (TypeError, ValueError):
         calls = str(tool_calls)
     if not content and not tool_calls:
@@ -188,7 +194,10 @@ def _message_signature(message: Any) -> tuple[str, str, str] | None:
 
 
 def _reconcile_snapshot_history_ids(
-    event: Any, *, initial_messages: list[Any], initial_message_ids: set[str],
+    event: Any,
+    *,
+    initial_messages: list[Any],
+    initial_message_ids: set[str],
 ) -> tuple[Any, set[str], bool]:
     """Identify the current-turn boundary and align historical snapshot IDs.
 
@@ -207,27 +216,46 @@ def _reconcile_snapshot_history_ids(
     if not initial_messages:
         return event, set(), True
 
-    latest_user_index = next((
-        index for index in range(len(initial_messages) - 1, -1, -1)
-        if _message_role(initial_messages[index]) == "user"
-    ), None)
+    latest_user_index = next(
+        (
+            index
+            for index in range(len(initial_messages) - 1, -1, -1)
+            if _message_role(initial_messages[index]) == "user"
+        ),
+        None,
+    )
     if latest_user_index is None:
         return event, set(), False
     latest_user = initial_messages[latest_user_index]
-    latest_user_id = _event_value(latest_user, "id", None) or _event_value(latest_user, "message_id", None)
+    latest_user_id = _event_value(latest_user, "id", None) or _event_value(
+        latest_user, "message_id", None
+    )
     latest_user_signature = _message_signature(latest_user)
 
     boundary = None
     if latest_user_id:
-        boundary = next((
-            index for index in range(len(messages) - 1, -1, -1)
-            if str(_event_value(messages[index], "id", None) or _event_value(messages[index], "message_id", None) or "") == str(latest_user_id)
-        ), None)
+        boundary = next(
+            (
+                index
+                for index in range(len(messages) - 1, -1, -1)
+                if str(
+                    _event_value(messages[index], "id", None)
+                    or _event_value(messages[index], "message_id", None)
+                    or ""
+                )
+                == str(latest_user_id)
+            ),
+            None,
+        )
     if boundary is None and latest_user_signature is not None:
-        boundary = next((
-            index for index in range(len(messages) - 1, -1, -1)
-            if _message_signature(messages[index]) == latest_user_signature
-        ), None)
+        boundary = next(
+            (
+                index
+                for index in range(len(messages) - 1, -1, -1)
+                if _message_signature(messages[index]) == latest_user_signature
+            ),
+            None,
+        )
     if boundary is None:
         return event, set(), False
 
@@ -271,6 +299,7 @@ def _copy_message_with_id(message: Any, message_id: str) -> Any:
         return model_copy(update={"id": message_id})
     try:
         from dataclasses import is_dataclass, replace
+
         if is_dataclass(message):
             return replace(message, id=message_id)
     except (TypeError, ValueError):
@@ -294,6 +323,7 @@ def _copy_event_with_messages(event: Any, messages: list[Any]) -> Any:
         return model_copy(update={"messages": messages})
     try:
         from dataclasses import is_dataclass, replace
+
         if is_dataclass(event):
             return replace(event, messages=messages)
     except (TypeError, ValueError):
@@ -307,7 +337,8 @@ def _copy_event_with_messages(event: Any, messages: list[Any]) -> Any:
 
 
 def _snapshot_current_turn_messages(
-    event: Any, initial_messages: list[Any],
+    event: Any,
+    initial_messages: list[Any],
 ) -> tuple[list[Any], bool]:
     """Return snapshot messages after the latest request user message.
 
@@ -322,29 +353,44 @@ def _snapshot_current_turn_messages(
     if not initial_messages:
         return list(messages), True
 
-    latest_user = next((
-        item for item in reversed(initial_messages) if _message_role(item) == "user"
-    ), None)
+    latest_user = next(
+        (item for item in reversed(initial_messages) if _message_role(item) == "user"), None
+    )
     if latest_user is None:
         return [], False
 
-    latest_id = _event_value(latest_user, "id", None) or _event_value(latest_user, "message_id", None)
+    latest_id = _event_value(latest_user, "id", None) or _event_value(
+        latest_user, "message_id", None
+    )
     boundary = None
     if latest_id:
-        boundary = next((
-            index for index in range(len(messages) - 1, -1, -1)
-            if str(_event_value(messages[index], "id", None) or _event_value(messages[index], "message_id", None) or "") == str(latest_id)
-        ), None)
+        boundary = next(
+            (
+                index
+                for index in range(len(messages) - 1, -1, -1)
+                if str(
+                    _event_value(messages[index], "id", None)
+                    or _event_value(messages[index], "message_id", None)
+                    or ""
+                )
+                == str(latest_id)
+            ),
+            None,
+        )
     if boundary is None:
         signature = _message_signature(latest_user)
         if signature is not None:
-            boundary = next((
-                index for index in range(len(messages) - 1, -1, -1)
-                if _message_signature(messages[index]) == signature
-            ), None)
+            boundary = next(
+                (
+                    index
+                    for index in range(len(messages) - 1, -1, -1)
+                    if _message_signature(messages[index]) == signature
+                ),
+                None,
+            )
     if boundary is None:
         return [], False
-    return list(messages[boundary + 1:]), True
+    return list(messages[boundary + 1 :]), True
 
 
 def _snapshot_tool_call_candidates(
@@ -367,19 +413,25 @@ def _snapshot_tool_call_candidates(
         if _message_role(message) != "assistant":
             continue
         message_id = str(
-            _event_value(message, "id", None)
-            or _event_value(message, "message_id", None)
-            or ""
+            _event_value(message, "id", None) or _event_value(message, "message_id", None) or ""
         )
         snapshot_text = _normalise_stream_text(_message_text(message))
         if snapshot_text and streamed_text_by_id:
-            matching_stream_id = next((
-                stream_id for stream_id, parts in streamed_text_by_id.items()
-                if _normalise_stream_text("".join(parts)) == snapshot_text
-            ), None)
+            matching_stream_id = next(
+                (
+                    stream_id
+                    for stream_id, parts in streamed_text_by_id.items()
+                    if _normalise_stream_text("".join(parts)) == snapshot_text
+                ),
+                None,
+            )
             if matching_stream_id:
                 message_id = matching_stream_id
-        calls = _event_value(message, "tool_calls", None) or _event_value(message, "toolCalls", None) or []
+        calls = (
+            _event_value(message, "tool_calls", None)
+            or _event_value(message, "toolCalls", None)
+            or []
+        )
         additional = _event_value(message, "additional_kwargs", None) or {}
         if not calls and isinstance(additional, dict):
             calls = additional.get("tool_calls") or []
@@ -388,14 +440,10 @@ def _snapshot_tool_call_candidates(
         for call in calls:
             function = _event_value(call, "function", None)
             name = str(
-                _event_value(call, "name", None)
-                or _event_value(function, "name", "")
-                or ""
+                _event_value(call, "name", None) or _event_value(function, "name", "") or ""
             ).strip()
             call_id = str(
-                _event_value(call, "id", None)
-                or _event_value(call, "tool_call_id", None)
-                or ""
+                _event_value(call, "id", None) or _event_value(call, "tool_call_id", None) or ""
             ).strip()
             arguments = _event_value(call, "args", None)
             if arguments is None:
@@ -407,23 +455,32 @@ def _snapshot_tool_call_candidates(
                     arguments = json.loads(arguments)
                 except (TypeError, ValueError):
                     continue
-            if not call_id or not name or name not in allowed_names or not isinstance(arguments, dict):
+            if (
+                not call_id
+                or not name
+                or name not in allowed_names
+                or not isinstance(arguments, dict)
+            ):
                 continue
             try:
-                args_json = json.dumps(arguments, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+                args_json = json.dumps(
+                    arguments, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+                )
             except (TypeError, ValueError):
                 continue
             signature = (name, args_json)
             if signature in seen:
                 continue
             seen.add(signature)
-            recovered.append({
-                "position": position,
-                "message_id": message_id,
-                "tool_call_id": call_id,
-                "tool_call_name": name,
-                "arguments_json": args_json,
-            })
+            recovered.append(
+                {
+                    "position": position,
+                    "message_id": message_id,
+                    "tool_call_id": call_id,
+                    "tool_call_name": name,
+                    "arguments_json": args_json,
+                }
+            )
     return recovered
 
 
@@ -459,9 +516,7 @@ def _snapshot_tool_result_candidates(
             continue
         name = known_name or snapshot_name
         message_id = str(
-            _event_value(message, "id", None)
-            or _event_value(message, "message_id", None)
-            or ""
+            _event_value(message, "id", None) or _event_value(message, "message_id", None) or ""
         ).strip()
         content = _event_value(message, "content", "")
         if not name or name not in allowed_names or not call_id or not message_id:
@@ -475,26 +530,28 @@ def _snapshot_tool_result_candidates(
         if signature in seen:
             continue
         seen.add(signature)
-        recovered.append({
-            "position": position,
-            "tool_name": name,
-            "tool_call_id": call_id,
-            "message_id": message_id,
-            "content": content,
-        })
+        recovered.append(
+            {
+                "position": position,
+                "tool_name": name,
+                "tool_call_id": call_id,
+                "message_id": message_id,
+                "content": content,
+            }
+        )
     return recovered
 
 
 def _has_customer_visible_text(
-    text_by_id: dict[str, list[str]], anonymous_text: list[str],
+    text_by_id: dict[str, list[str]],
+    anonymous_text: list[str],
 ) -> bool:
     """Ignore internal assessment JSON when deciding whether the UI got a reply."""
     values = ["".join(parts) for parts in text_by_id.values()]
     if anonymous_text:
         values.append("".join(anonymous_text))
     return any(
-        _normalise_stream_text(value)
-        and not _is_internal_assessment_text(value)
+        _normalise_stream_text(value) and not _is_internal_assessment_text(value)
         for value in values
     )
 
@@ -563,7 +620,9 @@ async def synthesize_terminal_assistant_message(
         if pending_snapshot is None:
             return
         reconciled, matched_history_ids, boundary_valid = _reconcile_snapshot_history_ids(
-            pending_snapshot, initial_messages=request_messages, initial_message_ids=prior_ids,
+            pending_snapshot,
+            initial_messages=request_messages,
+            initial_message_ids=prior_ids,
         )
         prior_ids.update(matched_history_ids)
         if matched_history_ids and on_history_reconciled:
@@ -581,10 +640,9 @@ async def synthesize_terminal_assistant_message(
                 streamed_text_by_id=assistant_text_by_id,
             )
             known_tool_call_names = dict(streamed_tool_names_by_id)
-            known_tool_call_names.update({
-                call["tool_call_id"]: call["tool_call_name"]
-                for call in snapshot_tool_calls
-            })
+            known_tool_call_names.update(
+                {call["tool_call_id"]: call["tool_call_name"] for call in snapshot_tool_calls}
+            )
             snapshot_tool_results = _snapshot_tool_result_candidates(
                 reconciled,
                 initial_messages=request_messages,
@@ -601,23 +659,18 @@ async def synthesize_terminal_assistant_message(
         candidate_text = _normalise_stream_text(candidate[1]) if candidate else ""
         if not candidate_text:
             return False
-        return (
-            any(
-                _normalise_stream_text("".join(parts)) == candidate_text
-                for parts in assistant_text_by_id.values()
-                if _normalise_stream_text("".join(parts))
-            )
-            or (
-                bool(anonymous_assistant_text)
-                and _normalise_stream_text("".join(anonymous_assistant_text)) == candidate_text
-            )
+        return any(
+            _normalise_stream_text("".join(parts)) == candidate_text
+            for parts in assistant_text_by_id.values()
+            if _normalise_stream_text("".join(parts))
+        ) or (
+            bool(anonymous_assistant_text)
+            and _normalise_stream_text("".join(anonymous_assistant_text)) == candidate_text
         )
 
     async def emit_snapshot_tool_events():
         nonlocal visible_tool_call
-        ordered_events = [
-            (call["position"], "call", call) for call in snapshot_tool_calls
-        ] + [
+        ordered_events = [(call["position"], "call", call) for call in snapshot_tool_calls] + [
             (result["position"], "result", result) for result in snapshot_tool_results
         ]
         for _position, event_kind, item in sorted(ordered_events, key=lambda entry: entry[0]):
@@ -629,7 +682,10 @@ async def synthesize_terminal_assistant_message(
                 if call_id in streamed_tool_call_ids or signature in streamed_tool_call_signatures:
                     continue
                 for generated in make_tool_call_events(
-                    call_id, item["tool_call_name"], item["message_id"], item["arguments_json"],
+                    call_id,
+                    item["tool_call_name"],
+                    item["message_id"],
+                    item["arguments_json"],
                 ):
                     yield generated
                 streamed_tool_call_ids.add(call_id)
@@ -645,7 +701,10 @@ async def synthesize_terminal_assistant_message(
             message_id = item["message_id"]
             if call_id not in streamed_tool_call_ids:
                 continue
-            if message_id in streamed_tool_result_message_ids or call_id in streamed_tool_result_call_ids:
+            if (
+                message_id in streamed_tool_result_message_ids
+                or call_id in streamed_tool_result_call_ids
+            ):
                 continue
             for generated in make_tool_result_events(call_id, message_id, item["content"]):
                 yield generated
@@ -686,7 +745,9 @@ async def synthesize_terminal_assistant_message(
                 try:
                     parsed_args = json.loads("".join(parts) or "{}")
                     if isinstance(parsed_args, dict):
-                        args_json = json.dumps(parsed_args, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+                        args_json = json.dumps(
+                            parsed_args, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+                        )
                         streamed_tool_call_signatures.add((call_name, args_json))
                 except (TypeError, ValueError):
                     pass
@@ -701,7 +762,9 @@ async def synthesize_terminal_assistant_message(
             try:
                 parsed_args = json.loads(delta or "{}")
                 if call_name and isinstance(parsed_args, dict):
-                    args_json = json.dumps(parsed_args, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+                    args_json = json.dumps(
+                        parsed_args, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+                    )
                     streamed_tool_call_signatures.add((call_name, args_json))
             except (TypeError, ValueError):
                 pass
@@ -806,7 +869,11 @@ async def filter_internal_assistant_messages(source: AsyncIterable[Any]) -> Asyn
                 yield event
                 continue
             delta = _event_delta(event)
-            key = message_id if message_id in buffers else ("__anonymous__" if anonymous_buffer is not None else "")
+            key = (
+                message_id
+                if message_id in buffers
+                else ("__anonymous__" if anonymous_buffer is not None else "")
+            )
             if key:
                 events, parts = buffers[key] if key != "__anonymous__" else anonymous_buffer
                 events.append(event)
@@ -838,7 +905,11 @@ async def filter_internal_assistant_messages(source: AsyncIterable[Any]) -> Asyn
                 yield event
                 non_assistant_ids.discard(message_id)
                 continue
-            key = message_id if message_id in buffers else ("__anonymous__" if anonymous_buffer is not None else "")
+            key = (
+                message_id
+                if message_id in buffers
+                else ("__anonymous__" if anonymous_buffer is not None else "")
+            )
             if key:
                 events, parts = buffers[key] if key != "__anonymous__" else anonymous_buffer
                 text = "".join(parts)
@@ -896,6 +967,7 @@ def _copy_event_with_delta(event: Any, delta: str) -> Any:
         return model_copy(update={"delta": delta})
     try:
         from dataclasses import is_dataclass, replace
+
         if is_dataclass(event):
             return replace(event, delta=delta)
     except (TypeError, ValueError):
@@ -927,8 +999,7 @@ def _progressive_chunks(text: str, target_chars: int) -> list[str]:
             expanded.append(chunk)
         else:
             expanded.extend(
-                chunk[index:index + target_chars]
-                for index in range(0, len(chunk), target_chars)
+                chunk[index : index + target_chars] for index in range(0, len(chunk), target_chars)
             )
     return expanded
 

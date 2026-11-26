@@ -7,6 +7,7 @@ and registered capability boundary. It does not execute capabilities or grant
 authority. The ``orai_*`` projection below remains an internal compatibility
 adapter into the existing OCCF validation/ToolNode path; it is not model-visible.
 """
+
 from __future__ import annotations
 
 import json
@@ -19,7 +20,9 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, ValidationError, create_model
 
 from shared.contracts.registry import (
-    capability_by_name, get_registry, validate_result_envelope,
+    capability_by_name,
+    get_registry,
+    validate_result_envelope,
 )
 
 logger = logging.getLogger("oraiflow.agent_runtime.interpretation")
@@ -31,7 +34,13 @@ class EvidenceQuote(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     field: str = Field(min_length=1, max_length=80)
-    source: Literal["current_turn", "conversation", "assistant_context", "application_context", "capability_result"]
+    source: Literal[
+        "current_turn",
+        "conversation",
+        "assistant_context",
+        "application_context",
+        "capability_result",
+    ]
     quote: str = Field(min_length=1, max_length=500)
 
 
@@ -65,19 +74,67 @@ class InterpretationAssessment(BaseModel):
 # above before validation. OCCF capability input schemas are not changed.
 _ASSESSMENT_TRANSPORT_PREFIX = "orai_"
 _ASSESSMENT_TOOL_FIELDS: dict[str, tuple[Any, Any]] = {
-    "orai_intent_id": (str | None, Field(default=None, description="Registered intent ID selected by the model.")),
-    "orai_intent_confidence": (float | None, Field(default=None, description="Intent confidence from 0 to 1; omit only if the model cannot assess it.")),
-    "orai_slot_confidence": (float | None, Field(default=None, description="Slot extraction confidence from 0 to 1.")),
-    "orai_entity_confidence": (float | None, Field(default=None, description="Entity resolution confidence from 0 to 1.")),
-    "orai_capability_selection_confidence": (float | None, Field(default=None, description="Registered capability selection confidence from 0 to 1.")),
-    "orai_resolution": (Literal["READY", "NEEDS_CLARIFICATION", "ABSTAIN"], Field(default="READY", description="READY only when the proposed operation has enough information; otherwise NEEDS_CLARIFICATION or ABSTAIN.")),
+    "orai_intent_id": (
+        str | None,
+        Field(default=None, description="Registered intent ID selected by the model."),
+    ),
+    "orai_intent_confidence": (
+        float | None,
+        Field(
+            default=None,
+            description="Intent confidence from 0 to 1; omit only if the model cannot assess it.",
+        ),
+    ),
+    "orai_slot_confidence": (
+        float | None,
+        Field(default=None, description="Slot extraction confidence from 0 to 1."),
+    ),
+    "orai_entity_confidence": (
+        float | None,
+        Field(default=None, description="Entity resolution confidence from 0 to 1."),
+    ),
+    "orai_capability_selection_confidence": (
+        float | None,
+        Field(default=None, description="Registered capability selection confidence from 0 to 1."),
+    ),
+    "orai_resolution": (
+        Literal["READY", "NEEDS_CLARIFICATION", "ABSTAIN"],
+        Field(
+            default="READY",
+            description="READY only when the proposed operation has enough information; otherwise NEEDS_CLARIFICATION or ABSTAIN.",
+        ),
+    ),
     # Accept primitive JSON values at the provider boundary (models often emit
     # numeric amounts as JSON numbers). assessment_from_tool_arguments()
     # normalizes them to the canonical string-valued maps before validation.
-    "orai_slots": (dict[str, Any], Field(default_factory=dict, description="Extracted named slot values, e.g. amount, currency, source_account_preference. Values may be JSON strings or numbers; the runtime normalizes them.")),
-    "orai_entities": (dict[str, Any], Field(default_factory=dict, description="Resolved or unresolved entity labels, e.g. beneficiary or workspace. The runtime normalizes primitive values.")),
-    "orai_evidence": (list[str], Field(default_factory=list, description="Evidence entries as plain strings: field|source|exact quote. Sources: current_turn, conversation, assistant_context, application_context, capability_result.")),
-    "orai_clarification_question": (str | None, Field(default=None, description="Natural-language clarification question when resolution is NEEDS_CLARIFICATION.")),
+    "orai_slots": (
+        dict[str, Any],
+        Field(
+            default_factory=dict,
+            description="Extracted named slot values, e.g. amount, currency, source_account_preference. Values may be JSON strings or numbers; the runtime normalizes them.",
+        ),
+    ),
+    "orai_entities": (
+        dict[str, Any],
+        Field(
+            default_factory=dict,
+            description="Resolved or unresolved entity labels, e.g. beneficiary or workspace. The runtime normalizes primitive values.",
+        ),
+    ),
+    "orai_evidence": (
+        list[str],
+        Field(
+            default_factory=list,
+            description="Evidence entries as plain strings: field|source|exact quote. Sources: current_turn, conversation, assistant_context, application_context, capability_result.",
+        ),
+    ),
+    "orai_clarification_question": (
+        str | None,
+        Field(
+            default=None,
+            description="Natural-language clarification question when resolution is NEEDS_CLARIFICATION.",
+        ),
+    ),
 }
 
 
@@ -97,7 +154,12 @@ def _assessment_transport_schema() -> dict[str, Any]:
         properties[name] = schema
         if field_info.is_required():
             required.append(name)
-    return {"type": "object", "properties": properties, "required": required, "additionalProperties": False}
+    return {
+        "type": "object",
+        "properties": properties,
+        "required": required,
+        "additionalProperties": False,
+    }
 
 
 def add_assessment_parameter(action: dict[str, Any]) -> dict[str, Any]:
@@ -125,7 +187,9 @@ def add_assessment_parameter(action: dict[str, Any]) -> dict[str, Any]:
     return enriched
 
 
-def with_required_interpretation_assessment(base_args_model: type[BaseModel], model_name: str) -> type[BaseModel]:
+def with_required_interpretation_assessment(
+    base_args_model: type[BaseModel], model_name: str
+) -> type[BaseModel]:
     """Add a flat provider-friendly assessment transport to a model-facing tool.
 
     This does not change the OCCF input model. The runtime later reconstructs
@@ -141,14 +205,19 @@ def _parse_transport_evidence(raw: Any) -> list[dict[str, str]]:
     still has to independently anchor every extracted value to an allowed source.
     """
     allowed_sources = {
-        "current_turn", "conversation", "assistant_context",
-        "application_context", "capability_result",
+        "current_turn",
+        "conversation",
+        "assistant_context",
+        "application_context",
+        "capability_result",
     }
     parsed: list[dict[str, str]] = []
     if isinstance(raw, dict):
         for field_name, quote in raw.items():
             if isinstance(quote, str) and quote.strip() and len(str(field_name)) <= 80:
-                parsed.append({"field": str(field_name), "source": "current_turn", "quote": quote[:500]})
+                parsed.append(
+                    {"field": str(field_name), "source": "current_turn", "quote": quote[:500]}
+                )
         return parsed
     if not isinstance(raw, list):
         return parsed
@@ -158,7 +227,11 @@ def _parse_transport_evidence(raw: Any) -> list[dict[str, str]]:
             parts = item.split("|", 2)
             if len(parts) == 3:
                 field_name, source, quote = parts
-                candidate = {"field": field_name.strip(), "source": source.strip(), "quote": quote.strip()}
+                candidate = {
+                    "field": field_name.strip(),
+                    "source": source.strip(),
+                    "quote": quote.strip(),
+                }
         elif isinstance(item, dict):
             candidate = item
         if not candidate:
@@ -166,8 +239,13 @@ def _parse_transport_evidence(raw: Any) -> list[dict[str, str]]:
         field_name = candidate.get("field")
         source = candidate.get("source")
         quote = candidate.get("quote")
-        if (isinstance(field_name, str) and 0 < len(field_name) <= 80
-                and source in allowed_sources and isinstance(quote, str) and quote.strip()):
+        if (
+            isinstance(field_name, str)
+            and 0 < len(field_name) <= 80
+            and source in allowed_sources
+            and isinstance(quote, str)
+            and quote.strip()
+        ):
             parsed.append({"field": field_name, "source": source, "quote": quote[:500]})
     return parsed
 
@@ -183,14 +261,18 @@ def _canonical_intent_id(value: Any) -> str:
 def unique_intent_for_capability(capability_id: str) -> str | None:
     """Return an intent only when the registry declares exactly one relationship."""
     candidates = [
-        intent_id for intent_id in get_registry().get("intents", {})
+        intent_id
+        for intent_id in get_registry().get("intents", {})
         if _intent_supports_capability(intent_id, capability_id)
     ]
     return candidates[0] if len(candidates) == 1 else None
 
 
 def assessment_from_tool_arguments(
-    raw_args: dict[str, Any], *, expected_capability_id: str, inferred_intent_id: str | None = None,
+    raw_args: dict[str, Any],
+    *,
+    expected_capability_id: str,
+    inferred_intent_id: str | None = None,
 ) -> tuple[dict[str, Any] | None, dict[str, Any]]:
     """Reconstruct the canonical assessment from a flat tool-call payload.
 
@@ -218,18 +300,35 @@ def assessment_from_tool_arguments(
         return default
 
     intent_id = take("orai_intent_id", "intent_id", default=inferred_intent_id)
-    declared_capability = take("orai_capability_id", "capability_id", default=expected_capability_id)
+    declared_capability = take(
+        "orai_capability_id", "capability_id", default=expected_capability_id
+    )
     confidence_object = take("orai_confidence", "confidence", default={})
     confidence_object = confidence_object if isinstance(confidence_object, dict) else {}
     raw_scores = {
-        "intent_confidence": take("orai_intent_confidence", "intent_confidence", default=confidence_object.get("intent")),
-        "slot_confidence": take("orai_slot_confidence", "slot_confidence", default=confidence_object.get("slot", confidence_object.get("slots"))),
-        "entity_confidence": take("orai_entity_confidence", "entity_confidence", default=confidence_object.get("entity", confidence_object.get("entities"))),
+        "intent_confidence": take(
+            "orai_intent_confidence", "intent_confidence", default=confidence_object.get("intent")
+        ),
+        "slot_confidence": take(
+            "orai_slot_confidence",
+            "slot_confidence",
+            default=confidence_object.get("slot", confidence_object.get("slots")),
+        ),
+        "entity_confidence": take(
+            "orai_entity_confidence",
+            "entity_confidence",
+            default=confidence_object.get("entity", confidence_object.get("entities")),
+        ),
         "capability_selection_confidence": take(
-            "orai_capability_selection_confidence", "capability_selection_confidence", "capability_confidence",
-            default=confidence_object.get("capability", confidence_object.get("capability_selection")),
+            "orai_capability_selection_confidence",
+            "capability_selection_confidence",
+            "capability_confidence",
+            default=confidence_object.get(
+                "capability", confidence_object.get("capability_selection")
+            ),
         ),
     }
+
     def string_map(value: Any) -> dict[str, str]:
         if not isinstance(value, dict):
             return {}
@@ -261,7 +360,8 @@ def assessment_from_tool_arguments(
 def strip_assessment_tool_arguments(raw_args: dict[str, Any]) -> dict[str, Any]:
     """Remove runtime-only assessment transport before capability validation."""
     return {
-        key: value for key, value in raw_args.items()
+        key: value
+        for key, value in raw_args.items()
         if key != "interpretation_assessment" and not key.startswith(_ASSESSMENT_TRANSPORT_PREFIX)
     }
 
@@ -362,7 +462,10 @@ def _value_is_supported(value: str, quote: str) -> bool:
     if not normalized_value or not normalized_quote:
         return False
     if re.fullmatch(r"\d+(?:[.,]\d+)?", normalized_value):
-        return re.search(rf"(?<![\d.,]){re.escape(normalized_value)}(?![\d.,])", normalized_quote) is not None
+        return (
+            re.search(rf"(?<![\d.,]){re.escape(normalized_value)}(?![\d.,])", normalized_quote)
+            is not None
+        )
     return normalized_value in normalized_quote
 
 
@@ -370,16 +473,38 @@ _CUSTOMER_SOURCES = {"current_turn", "conversation"}
 _TRUSTED_RECORD_SOURCES = {"application_context", "capability_result"}
 _UI_REFERENCE_SOURCES = _CUSTOMER_SOURCES | {"assistant_context"}
 _FINANCIAL_VALUE_FIELDS = {
-    "amount", "amount_minor", "currency", "beneficiary", "recipient", "name_query",
-    "merchant", "merchant_query", "date", "from_date", "to_date",
+    "amount",
+    "amount_minor",
+    "currency",
+    "beneficiary",
+    "recipient",
+    "name_query",
+    "merchant",
+    "merchant_query",
+    "date",
+    "from_date",
+    "to_date",
 }
 _TRUSTED_IDENTIFIER_FIELDS = {
-    "account_id", "source_account_id", "beneficiary_contact_id", "contact_id",
-    "transaction_id", "transaction_reference", "record_id",
+    "account_id",
+    "source_account_id",
+    "beneficiary_contact_id",
+    "contact_id",
+    "transaction_id",
+    "transaction_reference",
+    "record_id",
 }
 _SEMANTIC_ENUMS = {
     "source_account_preference": {"highest_balance", "lowest_balance"},
-    "transaction_selector": {"latest", "last", "last_item", "first", "first_item", "previous", "previous_item"},
+    "transaction_selector": {
+        "latest",
+        "last",
+        "last_item",
+        "first",
+        "first_item",
+        "previous",
+        "previous_item",
+    },
     "balance_scope": {"total", "available", "all_accounts", "selected_account", "current_account"},
     "account_scope": {"all_accounts", "selected_account", "current_account"},
 }
@@ -446,12 +571,40 @@ def _catalogue_names(sources: dict[str, str], *, key: str) -> list[str]:
 
 
 def _tokens(value: str) -> set[str]:
-    return {token for token in re.findall(r"[a-z0-9]+", _normalise_evidence_text(value)) if token not in {"the", "a", "an", "my", "me", "to", "from", "account", "workspace", "please", "show", "open", "go", "take", "there"}}
+    return {
+        token
+        for token in re.findall(r"[a-z0-9]+", _normalise_evidence_text(value))
+        if token
+        not in {
+            "the",
+            "a",
+            "an",
+            "my",
+            "me",
+            "to",
+            "from",
+            "account",
+            "workspace",
+            "please",
+            "show",
+            "open",
+            "go",
+            "take",
+            "there",
+        }
+    }
 
 
 def _workspace_value_supported(value: str, quote: str) -> bool:
     pages = get_registry().get("application_policy", {}).get("navigation", {}).get("pages", [])
-    canonical = next((str(page) for page in pages if _normalise_evidence_text(page) == _normalise_evidence_text(value)), None)
+    canonical = next(
+        (
+            str(page)
+            for page in pages
+            if _normalise_evidence_text(page) == _normalise_evidence_text(value)
+        ),
+        None,
+    )
     if not canonical:
         return False
     quote_tokens = _tokens(quote)
@@ -461,25 +614,28 @@ def _workspace_value_supported(value: str, quote: str) -> bool:
     # when it identifies exactly one registered page, never by first-match.
     if _normalise_evidence_text(canonical) in _normalise_evidence_text(quote):
         return True
-    matches = [
-        str(page) for page in pages
-        if quote_tokens <= _tokens(str(page))
-    ]
-    return len(matches) == 1 and _normalise_evidence_text(matches[0]) == _normalise_evidence_text(canonical)
+    matches = [str(page) for page in pages if quote_tokens <= _tokens(str(page))]
+    return len(matches) == 1 and _normalise_evidence_text(matches[0]) == _normalise_evidence_text(
+        canonical
+    )
 
 
 def _reference_language_present(text: str, *, kind: str) -> bool:
     normalized = _normalise_evidence_text(text)
     if kind == "workspace":
-        return bool(re.search(
-            r"\b(?:there|here|it|that|that workspace|that page|the workspace|the page)\b",
-            normalized,
-        ))
+        return bool(
+            re.search(
+                r"\b(?:there|here|it|that|that workspace|that page|the workspace|the page)\b",
+                normalized,
+            )
+        )
     if kind == "transaction":
-        return bool(re.search(
-            r"\b(?:last|latest|most recent|previous|prior|final|first|latter|former|bottom)\b",
-            normalized,
-        ))
+        return bool(
+            re.search(
+                r"\b(?:last|latest|most recent|previous|prior|final|first|latter|former|bottom)\b",
+                normalized,
+            )
+        )
     return False
 
 
@@ -490,8 +646,10 @@ def _semantic_enum_supported(field_name: str, value: str, quote: str) -> bool:
         high = bool(re.search(r"\b(?:highest|higher|largest|biggest|maximum|max|most)\b", text))
         low = bool(re.search(r"\b(?:lowest|lower|smallest|smaller|least|minimum|min)\b", text))
         money = bool(re.search(r"\b(?:balance|amount|money|funds|value)\b", text))
-        return money and ((value == "highest_balance" and high and not low)
-                          or (value == "lowest_balance" and low and not high))
+        return money and (
+            (value == "highest_balance" and high and not low)
+            or (value == "lowest_balance" and low and not high)
+        )
     if field_name == "transaction_selector":
         if value in {"latest", "last"}:
             return bool(re.search(r"\b(?:latest|recent|last|most recent)\b", text))
@@ -511,7 +669,9 @@ def _semantic_enum_supported(field_name: str, value: str, quote: str) -> bool:
             return _semantic_enum_supported("account_scope", value, quote)
     if field_name == "account_scope":
         if value == "all_accounts":
-            return bool(re.search(r"\b(?:all|every|across)\b.*\baccounts?\b|\ball accounts?\b", text))
+            return bool(
+                re.search(r"\b(?:all|every|across)\b.*\baccounts?\b|\ball accounts?\b", text)
+            )
         if value in {"selected_account", "current_account"}:
             return bool(re.search(r"\b(?:selected|current|this|that)\b.*\baccount\b", text))
     return False
@@ -519,7 +679,14 @@ def _semantic_enum_supported(field_name: str, value: str, quote: str) -> bool:
 
 def _account_alias_supported(value: str, quote: str, sources: dict[str, str]) -> bool:
     catalogue = _catalogue_names(sources, key="account_name")
-    canonical = next((name for name in catalogue if _normalise_evidence_text(name) == _normalise_evidence_text(value)), None)
+    canonical = next(
+        (
+            name
+            for name in catalogue
+            if _normalise_evidence_text(name) == _normalise_evidence_text(value)
+        ),
+        None,
+    )
     if not canonical:
         return False
     quote_tokens = _tokens(quote)
@@ -587,7 +754,8 @@ def _field_value_supported(
     field = field_name.casefold()
     semantic_spec = (semantic_inputs or {}).get(field)
     allowed_items = [
-        item for item in evidence_items
+        item
+        for item in evidence_items
         if _source_allowed_for_field(field, item.source, semantic_inputs)
     ]
     if not allowed_items:
@@ -601,7 +769,8 @@ def _field_value_supported(
         if value not in allowed_values:
             return False
         customer_quotes = [
-            item.quote for item in allowed_items
+            item.quote
+            for item in allowed_items
             if item.source in _CUSTOMER_SOURCES and item.quote.strip()
         ]
         phrase_map = semantic_spec.get("evidence_phrases", {})
@@ -623,7 +792,11 @@ def _field_value_supported(
         customer_quotes = [item.quote for item in allowed_items if item.source in _CUSTOMER_SOURCES]
         if not any(_semantic_enum_supported(field, value, quote) for quote in customer_quotes):
             return False
-        if field == "transaction_selector" and value in {"last_item", "previous_item", "first_item"}:
+        if field == "transaction_selector" and value in {
+            "last_item",
+            "previous_item",
+            "first_item",
+        }:
             # Referential transaction choices need both a customer reference
             # and a validated prior MCP result containing the referenced item.
             return any(item.source == "capability_result" for item in evidence_items)
@@ -648,14 +821,19 @@ def _field_value_supported(
                     continue
                 if _workspace_value_supported(value, item.quote):
                     return True
-            elif _value_is_supported(value, item.quote) or _workspace_value_supported(value, item.quote):
+            elif _value_is_supported(value, item.quote) or _workspace_value_supported(
+                value, item.quote
+            ):
                 return True
         return False
 
     if field in _ACCOUNT_NAME_FIELDS:
         return any(
             _value_is_supported(value, item.quote)
-            or (item.source in _CUSTOMER_SOURCES and _account_alias_supported(value, item.quote, sources))
+            or (
+                item.source in _CUSTOMER_SOURCES
+                and _account_alias_supported(value, item.quote, sources)
+            )
             for item in allowed_items
         )
 
@@ -668,6 +846,7 @@ def _field_value_supported(
         )
 
     return any(_value_is_supported(value, item.quote) for item in allowed_items)
+
 
 def _quote_for_supported_value(value: str, source_text: str) -> str | None:
     """Return an exact source span supporting a value, without inventing text."""
@@ -696,7 +875,13 @@ def _anchor_field_evidence(
         # whole-turn quote to it. The model must provide a field-specific
         # exact customer quotation for every semantic value it proposes.
         return anchored
-    source_priority = ["current_turn", "conversation", "application_context", "capability_result", "assistant_context"]
+    source_priority = [
+        "current_turn",
+        "conversation",
+        "application_context",
+        "capability_result",
+        "assistant_context",
+    ]
 
     if field == "currency":
         aliases = _CURRENCY_ALIASES.get(value.upper(), {value.casefold()})
@@ -704,24 +889,33 @@ def _anchor_field_evidence(
             source_text = sources.get(source_name, "")
             normalized = _normalise_evidence_text(source_text)
             if source_text and any(alias in normalized for alias in aliases):
-                return [EvidenceQuote(field=field_name, source=source_name, quote=source_text[:500])]
+                return [
+                    EvidenceQuote(field=field_name, source=source_name, quote=source_text[:500])
+                ]
 
     if field == "amount":
         for source_name in ("current_turn", "conversation"):
             source_text = sources.get(source_name, "")
             if source_text and _decimal_value_supported(value, source_text):
-                return [EvidenceQuote(field=field_name, source=source_name, quote=source_text[:500])]
+                return [
+                    EvidenceQuote(field=field_name, source=source_name, quote=source_text[:500])
+                ]
 
     if field in _SEMANTIC_ENUMS:
         for source_name in ("current_turn", "conversation"):
             quote = sources.get(source_name, "")
             if quote and _semantic_enum_supported(field, value, quote):
-                anchored.append(EvidenceQuote(field=field_name, source=source_name, quote=quote[:500]))
+                anchored.append(
+                    EvidenceQuote(field=field_name, source=source_name, quote=quote[:500])
+                )
                 if field == "transaction_selector" and sources.get("capability_result"):
-                    anchored.append(EvidenceQuote(
-                        field=field_name, source="capability_result",
-                        quote=sources["capability_result"][:500],
-                    ))
+                    anchored.append(
+                        EvidenceQuote(
+                            field=field_name,
+                            source="capability_result",
+                            quote=sources["capability_result"][:500],
+                        )
+                    )
                 return anchored
 
     if field in _WORKSPACE_FIELDS:
@@ -729,9 +923,13 @@ def _anchor_field_evidence(
         if _reference_language_present(current_turn, kind="workspace"):
             assistant_quote = sources.get("assistant_context", "")
             if assistant_quote and _workspace_value_supported(value, assistant_quote):
-                return [EvidenceQuote(
-                    field=field_name, source="assistant_context", quote=assistant_quote[:500],
-                )]
+                return [
+                    EvidenceQuote(
+                        field=field_name,
+                        source="assistant_context",
+                        quote=assistant_quote[:500],
+                    )
+                ]
 
     for source_name in source_priority:
         if not _source_allowed_for_field(field, source_name, semantic_inputs):
@@ -745,11 +943,15 @@ def _anchor_field_evidence(
             return anchored
         if field in _ACCOUNT_NAME_FIELDS and source_name in _CUSTOMER_SOURCES:
             if _account_alias_supported(value, source_text, sources):
-                anchored.append(EvidenceQuote(field=field_name, source=source_name, quote=source_text[:500]))
+                anchored.append(
+                    EvidenceQuote(field=field_name, source=source_name, quote=source_text[:500])
+                )
                 return anchored
         if field in _WORKSPACE_FIELDS and source_name in _CUSTOMER_SOURCES:
             if _workspace_value_supported(value, source_text):
-                anchored.append(EvidenceQuote(field=field_name, source=source_name, quote=source_text[:500]))
+                anchored.append(
+                    EvidenceQuote(field=field_name, source=source_name, quote=source_text[:500])
+                )
                 return anchored
     return anchored
 
@@ -783,7 +985,9 @@ def anchor_assessment_evidence(
     if not any(item.field == "intent" and item.source in _CUSTOMER_SOURCES for item in valid_items):
         current_turn = sources.get("current_turn", "")
         if current_turn:
-            valid_items.append(EvidenceQuote(field="intent", source="current_turn", quote=current_turn[:500]))
+            valid_items.append(
+                EvidenceQuote(field="intent", source="current_turn", quote=current_turn[:500])
+            )
 
     for field_name, value in {**assessment.slots, **assessment.entities}.items():
         existing = by_field.get(field_name, [])
@@ -822,7 +1026,11 @@ def validate_interpretation_assessment(
     after calibration. Structural, registry and evidence checks always apply.
     """
     try:
-        assessment = raw if isinstance(raw, InterpretationAssessment) else InterpretationAssessment.model_validate(raw)
+        assessment = (
+            raw
+            if isinstance(raw, InterpretationAssessment)
+            else InterpretationAssessment.model_validate(raw)
+        )
     except (ValidationError, TypeError, ValueError) as exc:
         issues: list[str] = []
         if isinstance(exc, ValidationError):
@@ -831,17 +1039,25 @@ def validate_interpretation_assessment(
                 issue_type = str(item.get("type", "invalid"))
                 issues.append(f"{path}:{issue_type}")
         return None, {
-            "decision": "CLARIFY", "code": "ASSESSMENT_SCHEMA_INVALID",
-            "detail": type(exc).__name__, "issues": issues,
+            "decision": "CLARIFY",
+            "code": "ASSESSMENT_SCHEMA_INVALID",
+            "detail": type(exc).__name__,
+            "issues": issues,
         }
 
     registry = get_registry()
     intent_contract = registry.get("intents", {}).get(assessment.intent_id, {})
-    execution_plan = intent_contract.get("execution_plan", {}) if isinstance(intent_contract, dict) else {}
-    semantic_inputs = execution_plan.get("semantic_inputs", {}) if isinstance(execution_plan, dict) else {}
+    execution_plan = (
+        intent_contract.get("execution_plan", {}) if isinstance(intent_contract, dict) else {}
+    )
+    semantic_inputs = (
+        execution_plan.get("semantic_inputs", {}) if isinstance(execution_plan, dict) else {}
+    )
     semantic_inputs = semantic_inputs if isinstance(semantic_inputs, dict) else {}
     assessment, evidence_anchor_info = anchor_assessment_evidence(
-        assessment, sources, semantic_inputs=semantic_inputs,
+        assessment,
+        sources,
+        semantic_inputs=semantic_inputs,
     )
     if assessment.intent_id not in registry.get("intents", {}):
         return assessment, {"decision": "REJECT", "code": "UNKNOWN_INTENT"}
@@ -865,7 +1081,11 @@ def validate_interpretation_assessment(
             continue
         grounded.setdefault(item.field, []).append(item)
     if invalid_evidence:
-        return assessment, {"decision": "CLARIFY", "code": "EVIDENCE_NOT_IN_SOURCE", "fields": sorted(set(invalid_evidence))}
+        return assessment, {
+            "decision": "CLARIFY",
+            "code": "EVIDENCE_NOT_IN_SOURCE",
+            "fields": sorted(set(invalid_evidence)),
+        }
 
     # The customer instruction must always be grounded in customer-authored
     # text. Assistant text is separately available for resolving deictic UI
@@ -880,20 +1100,33 @@ def validate_interpretation_assessment(
     for field_name, value in {**assessment.slots, **assessment.entities}.items():
         candidates = grounded.get(field_name, [])
         semantic_spec = semantic_inputs.get(field_name)
-        if candidates and isinstance(semantic_spec, dict) and value not in semantic_spec.get("allowed_values", []):
+        if (
+            candidates
+            and isinstance(semantic_spec, dict)
+            and value not in semantic_spec.get("allowed_values", [])
+        ):
             unsupported_semantic_values.append(field_name)
             continue
         if not candidates or not _field_value_supported(
-            field_name, value, candidates, sources, semantic_inputs,
+            field_name,
+            value,
+            candidates,
+            sources,
+            semantic_inputs,
         ):
             unsupported.append(field_name)
     if unsupported_semantic_values:
         return assessment, {
-            "decision": "CLARIFY", "code": "INTENT_SEMANTIC_VALUE_UNSUPPORTED",
+            "decision": "CLARIFY",
+            "code": "INTENT_SEMANTIC_VALUE_UNSUPPORTED",
             "fields": sorted(set(unsupported_semantic_values)),
         }
     if unsupported:
-        return assessment, {"decision": "CLARIFY", "code": "VALUE_EVIDENCE_MISSING", "fields": sorted(set(unsupported))}
+        return assessment, {
+            "decision": "CLARIFY",
+            "code": "VALUE_EVIDENCE_MISSING",
+            "fields": sorted(set(unsupported)),
+        }
 
     preference = assessment.slots.get("source_account_preference")
     if preference is not None and preference not in {"highest_balance", "lowest_balance"}:
@@ -901,11 +1134,17 @@ def validate_interpretation_assessment(
 
     if expected_capability_id == "banking.contacts.search":
         if assessment.intent_id == "SAVED_CONTACT_LOOKUP":
-            contact_name = assessment.entities.get("contact_name") or assessment.slots.get("contact_name")
+            contact_name = assessment.entities.get("contact_name") or assessment.slots.get(
+                "contact_name"
+            )
             if not contact_name:
                 return assessment, {"decision": "CLARIFY", "code": "CONTACT_NAME_NOT_EXTRACTED"}
         else:
-            beneficiary = assessment.entities.get("beneficiary") or assessment.slots.get("beneficiary") or assessment.slots.get("recipient")
+            beneficiary = (
+                assessment.entities.get("beneficiary")
+                or assessment.slots.get("beneficiary")
+                or assessment.slots.get("recipient")
+            )
             if not beneficiary:
                 return assessment, {"decision": "CLARIFY", "code": "BENEFICIARY_NOT_EXTRACTED"}
             amount_value = assessment.slots.get("amount")
@@ -932,27 +1171,39 @@ def validate_interpretation_assessment(
     unknown_dimensions = applicable - set(scores)
     if unknown_dimensions:
         return assessment, {"decision": "REJECT", "code": "CONFIDENCE_DIMENSION_UNKNOWN"}
-    missing_scores = [name for name, score in scores.items() if name in applicable and score is None]
+    missing_scores = [
+        name for name, score in scores.items() if name in applicable and score is None
+    ]
     # Contact search is candidate discovery. Final entity confidence is
     # evaluated only after the runtime has authenticated candidate records.
     deferred_dimensions = (
-        {"entity"} if expected_capability_id == "banking.contacts.search"
-        and assessment.intent_id == "TRANSFER_PREPARATION" else set()
+        {"entity"}
+        if expected_capability_id == "banking.contacts.search"
+        and assessment.intent_id == "TRANSFER_PREPARATION"
+        else set()
     )
     if configuration["mode"] == "enforce":
         required_missing = [name for name in missing_scores if name not in deferred_dimensions]
         if required_missing:
             return assessment, {
-                "decision": "CLARIFY", "code": "CONFIDENCE_MISSING",
+                "decision": "CLARIFY",
+                "code": "CONFIDENCE_MISSING",
                 "dimensions": required_missing,
             }
         below = [
-            name for name, score in scores.items()
-            if name in applicable and name not in deferred_dimensions and score is not None
+            name
+            for name, score in scores.items()
+            if name in applicable
+            and name not in deferred_dimensions
+            and score is not None
             and score < configuration["thresholds"][name]
         ]
         if below:
-            return assessment, {"decision": "CLARIFY", "code": "CONFIDENCE_BELOW_THRESHOLD", "dimensions": below}
+            return assessment, {
+                "decision": "CLARIFY",
+                "code": "CONFIDENCE_BELOW_THRESHOLD",
+                "dimensions": below,
+            }
     else:
         deferred_dimensions = set()
 
@@ -981,7 +1232,9 @@ def _message_text(content: Any) -> str:
     return ""
 
 
-def assessment_sources(messages: list[Any], current_text: str, application_context: dict[str, Any]) -> dict[str, str]:
+def assessment_sources(
+    messages: list[Any], current_text: str, application_context: dict[str, Any]
+) -> dict[str, str]:
     """Build role-separated, provenance-aware interpretation evidence sources.
 
     Assistant messages support conversational/UI reference resolution only.
@@ -1017,20 +1270,30 @@ def assessment_sources(messages: list[Any], current_text: str, application_conte
                 continue
             if envelope.get("trust_class") != "untrusted_banking_data":
                 continue
-            tool_texts.append(json.dumps({
-                "capability_id": capability_id,
-                "outcome": envelope.get("outcome"),
-                "data": envelope.get("data"),
-            }, ensure_ascii=False, sort_keys=True))
+            tool_texts.append(
+                json.dumps(
+                    {
+                        "capability_id": capability_id,
+                        "outcome": envelope.get("outcome"),
+                        "data": envelope.get("data"),
+                    },
+                    ensure_ascii=False,
+                    sort_keys=True,
+                )
+            )
 
     conversation = "\n".join(human_texts[-12:])
-    if current_text and _normalise_evidence_text(current_text) not in _normalise_evidence_text(conversation):
+    if current_text and _normalise_evidence_text(current_text) not in _normalise_evidence_text(
+        conversation
+    ):
         conversation = "\n".join([conversation, current_text[:4000]])
     return {
         "current_turn": current_text[:4000] if current_text else "",
         "conversation": conversation,
         "assistant_context": "\n".join(assistant_texts[-8:]),
-        "application_context": json.dumps(application_context or {}, ensure_ascii=False, sort_keys=True),
+        "application_context": json.dumps(
+            application_context or {}, ensure_ascii=False, sort_keys=True
+        ),
         "capability_result": "\n".join(tool_texts[-8:]),
     }
 
@@ -1068,6 +1331,7 @@ def registered_capability_vocabulary() -> str:
         )
     return "\n".join(rows)
 
+
 def registered_presentation_vocabulary() -> str:
     """Render presentation names and their verified-data dependencies for the LLM."""
     rows: list[str] = []
@@ -1098,7 +1362,9 @@ def sanitize_customer_text(text: str) -> str:
     for token in sorted((item for item in tokens if item), key=len, reverse=True):
         cleaned = re.sub(
             rf"(?<![A-Za-z0-9_])`?{re.escape(token)}`?(?![A-Za-z0-9_])",
-            "", cleaned, flags=re.IGNORECASE,
+            "",
+            cleaned,
+            flags=re.IGNORECASE,
         )
     cleaned = re.sub(r"[ \t]{2,}", " ", cleaned)
     cleaned = re.sub(r"\n[ \t]*\n[ \t]*\n+", "\n\n", cleaned)

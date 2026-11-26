@@ -51,7 +51,8 @@ ORAIflow Core is a local-first reference implementation for agent-assisted finan
 - **Banking Kernel:** FastAPI command boundary validates demo identity, previews, policy and explicit customer confirmation independently of the LLM.
 - **Workflow orchestration:** PostgreSQL operational state and the outbox retain accepted work and hand it to the local Temporal development server. Temporal history is disposable when that container is recreated; the current ledger adapter is synthetic PostgreSQL only.
 
-The analytical capability supports filtered, aggregated reads over booked demo records with explicit handling of empty and partial results. The transfer assistant resolves contacts and prepares editable drafts — a draft is not an approval or submitted payment. See[Synthetic Demo Data Assumptions](docs/DEMO-DATA-ASSUMPTIONS.md).
+The analytical capability supports filtered, aggregated reads over booked demo records with explicit handling of empty and partial results. The transfer assistant resolves contacts and prepares editable drafts — a draft is not an approval or submitted payment. 
+See [Synthetic Demo Data Assumptions](docs/DEMO-DATA-ASSUMPTIONS.md).
 
 
 ## Run the local demo

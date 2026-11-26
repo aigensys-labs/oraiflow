@@ -1,4 +1,5 @@
 """Single-use confirmation state for conversational workspace navigation."""
+
 from __future__ import annotations
 
 import re
@@ -20,7 +21,6 @@ _NEGATIVE = re.compile(
     r"^(?:no|no\s+thanks|not\s+now|cancel|leave\s+it|don't|do\s+not)[.! ]*$",
     re.IGNORECASE,
 )
-
 
 
 # Resource-view requests are deterministic canonical workspace routes. This is
@@ -50,13 +50,17 @@ def resolve_workspace_target(value: str) -> str | None:
     # ("take me to Academy then"). They are not part of the registered page
     # name and should not force a redundant clarification.
     target = re.sub(r"\s+(?:then|now|please|thanks|thank you)$", "", target).strip()
-    target = " ".join(word for word in target.split() if word not in {"my", "the", "tab", "workspace", "page"})
+    target = " ".join(
+        word for word in target.split() if word not in {"my", "the", "tab", "workspace", "page"}
+    )
     if not target:
         return None
     navigation = get_registry().get("application_policy", {}).get("navigation", {})
     pages = set(navigation.get("pages", []))
-    candidates = {_normalise_page_alias(str(alias)): str(destination)
-                  for alias, destination in navigation.get("aliases", {}).items()}
+    candidates = {
+        _normalise_page_alias(str(alias)): str(destination)
+        for alias, destination in navigation.get("aliases", {}).items()
+    }
     candidates.update({_normalise_page_alias(page): page for page in pages})
     destination = candidates.get(target)
     return destination if destination in pages else None
@@ -65,10 +69,12 @@ def resolve_workspace_target(value: str) -> str | None:
 def is_incomplete_navigation_request(text: str) -> bool:
     """Identify a navigation objective whose destination is not yet specified."""
     value = re.sub(r"\s+", " ", str(text or "")).casefold().strip(" .!?")
-    return bool(re.fullmatch(
-        r"(?:please\s+)?(?:let(?:'s|s)\s+)?(?:go|go\s+to|open|navigate(?:\s+to)?|switch(?:\s+to)?|take\s+me\s+there|bring\s+me\s+there|take\s+me\s+to)",
-        value,
-    ))
+    return bool(
+        re.fullmatch(
+            r"(?:please\s+)?(?:let(?:'s|s)\s+)?(?:go|go\s+to|open|navigate(?:\s+to)?|switch(?:\s+to)?|take\s+me\s+there|bring\s+me\s+there|take\s+me\s+to)",
+            value,
+        )
+    )
 
 
 def attach_navigation_task(message: Any, stage: str, state: dict[str, Any] | None = None) -> Any:
@@ -80,7 +86,9 @@ def attach_navigation_task(message: Any, stage: str, state: dict[str, Any] | Non
         domain="navigation",
         intent_id="WORKSPACE_NAVIGATION",
         stage=stage,
-        status="ACTIVE" if stage in {"AWAITING_DESTINATION", "AWAITING_CONFIRMATION"} else "COMPLETED",
+        status=(
+            "ACTIVE" if stage in {"AWAITING_DESTINATION", "AWAITING_CONFIRMATION"} else "COMPLETED"
+        ),
         state=values,
     )
     return attach_pending_task(message, task)
@@ -142,7 +150,11 @@ def _conversation_workspace_reference(messages: list[Any] | tuple[Any, ...] | No
         if not content.strip():
             continue
         is_navigation_clarification = bool(
-            re.search(r"\bwhich\s+(?:orai\s*flow\s+)?workspace\s+(?:would\s+you\s+like\s+me\s+to\s+open|did\s+you\s+mean)\b", content, re.IGNORECASE)
+            re.search(
+                r"\bwhich\s+(?:orai\s*flow\s+)?workspace\s+(?:would\s+you\s+like\s+me\s+to\s+open|did\s+you\s+mean)\b",
+                content,
+                re.IGNORECASE,
+            )
             or re.search(r"\bwhich\s+one\s+should\s+i\s+open\b", content, re.IGNORECASE)
         )
         if is_navigation_clarification:
@@ -163,14 +175,17 @@ def _conversation_workspace_reference(messages: list[Any] | tuple[Any, ...] | No
         # differences in assistant prose (for example, "Controls & audit").
         page_pattern = r"\s+".join(re.escape(part) for part in normalized_page.split())
         if page_pattern and re.search(
-            rf"(?<![a-z0-9]){page_pattern}(?![a-z0-9])", normalized_content,
+            rf"(?<![a-z0-9]){page_pattern}(?![a-z0-9])",
+            normalized_content,
         ):
             mentioned.add(page)
     return next(iter(mentioned)) if len(mentioned) == 1 else None
 
 
 def resolve_workspace_request(
-    text: str, *, messages: list[Any] | tuple[Any, ...] | None = None,
+    text: str,
+    *,
+    messages: list[Any] | tuple[Any, ...] | None = None,
 ) -> str | None:
     """Resolve an explicit resource-view request to one registered workspace.
 
@@ -186,8 +201,14 @@ def resolve_workspace_request(
 
     normalized_value = value.casefold().strip(" .!?\t")
     direct_patterns = (
-        (r"^(?:who are|show me)\s+(?:my\s+)?(?:saved\s+)?(?:beneficiaries|payees|recipients|contacts)\??$", "Contacts"),
-        (r"^(?:list|show|view)\s+(?:all\s+)?(?:my\s+)?(?:saved\s+)?(?:beneficiaries|payees|recipients|contacts)\??$", "Contacts"),
+        (
+            r"^(?:who are|show me)\s+(?:my\s+)?(?:saved\s+)?(?:beneficiaries|payees|recipients|contacts)\??$",
+            "Contacts",
+        ),
+        (
+            r"^(?:list|show|view)\s+(?:all\s+)?(?:my\s+)?(?:saved\s+)?(?:beneficiaries|payees|recipients|contacts)\??$",
+            "Contacts",
+        ),
         # A question asking what contacts the customer has is a request to view
         # the registered Contacts workspace, not a capabilities-help question.
         (r"^what\s+are\s+(?:my\s+)?(?:saved\s+)?contacts\??$", "Contacts"),
@@ -267,10 +288,10 @@ def navigation_action_already_emitted(messages: list[Any], workspace: str) -> bo
         return False
 
     expected = str(workspace or "")
-    for message in items[latest_human + 1:]:
+    for message in items[latest_human + 1 :]:
         message_type = getattr(message, "type", "")
         if message_type == "ai":
-            for call in (getattr(message, "tool_calls", None) or []):
+            for call in getattr(message, "tool_calls", None) or []:
                 if not isinstance(call, dict) or call.get("name") != "navigate_workspace":
                     continue
                 arguments = call.get("args") if isinstance(call.get("args"), dict) else {}
@@ -278,15 +299,18 @@ def navigation_action_already_emitted(messages: list[Any], workspace: str) -> bo
                     return True
             additional = getattr(message, "additional_kwargs", {}) or {}
             receipt = additional.get("oraiflow_frontend_action_receipt")
-            if (isinstance(receipt, dict)
-                    and receipt.get("capability_id") == "frontend.workspace.navigate"
-                    and receipt.get("status") in {"opened", "SUCCESS"}):
+            if (
+                isinstance(receipt, dict)
+                and receipt.get("capability_id") == "frontend.workspace.navigate"
+                and receipt.get("status") in {"opened", "SUCCESS"}
+            ):
                 return True
         elif message_type == "tool" and getattr(message, "name", "") == "navigate_workspace":
             # Any receipt for the same turn consumes the action, including a
             # rejected one. Retrying requires a new customer instruction.
             return True
     return False
+
 
 def navigation_confirmation_metadata(workspace: str, navigation_epoch: int = 0) -> dict[str, Any]:
     """Metadata attached only after a validated, allowlisted navigation proposal."""
@@ -303,7 +327,12 @@ def navigation_confirmation_metadata(workspace: str, navigation_epoch: int = 0) 
 def _latest_pending_navigation(messages: list[Any]) -> dict[str, Any] | None:
     task = latest_pending_task(messages, domain="navigation")
     if task:
-        return {**dict(task.state), "stage": task.stage, "status": task.status, "task_id": task.task_id}
+        return {
+            **dict(task.state),
+            "stage": task.stage,
+            "status": task.status,
+            "task_id": task.task_id,
+        }
     # Once the current customer turn has any assistant response, older legacy
     # confirmation metadata is stale. In particular, a completed typed
     # NAVIGATION_REQUESTED task must consume the old confirmation, not revive it
@@ -313,7 +342,7 @@ def _latest_pending_navigation(messages: list[Any]) -> dict[str, Any] | None:
         (index for index, message in enumerate(items) if getattr(message, "type", "") == "human"),
         default=len(items),
     )
-    if any(getattr(message, "type", "") == "ai" for message in items[latest_human + 1:]):
+    if any(getattr(message, "type", "") == "ai" for message in items[latest_human + 1 :]):
         return None
     # Read-only compatibility for navigation confirmations saved before the
     # shared PendingTaskContext envelope was introduced.
@@ -331,7 +360,9 @@ def _latest_pending_navigation(messages: list[Any]) -> dict[str, Any] | None:
 
 
 def resolve_pending_navigation_confirmation(
-    messages: list[Any], current_text: str, available_actions: set[str],
+    messages: list[Any],
+    current_text: str,
+    available_actions: set[str],
 ) -> dict[str, Any] | None:
     """Resolve yes/no only against the immediately preceding pending UI action.
 
@@ -356,8 +387,12 @@ def resolve_pending_navigation_confirmation(
     pages = set(get_registry().get("application_policy", {}).get("navigation", {}).get("pages", []))
     registered = get_registry().get("capabilities", {}).get("frontend.workspace.navigate", {})
     action_name = str(registered.get("name", ""))
-    if (pending.get("action") != "frontend.workspace.navigate"
-            or workspace not in pages or not action_name or action_name not in available_actions):
+    if (
+        pending.get("action") != "frontend.workspace.navigate"
+        or workspace not in pages
+        or not action_name
+        or action_name not in available_actions
+    ):
         return {
             "kind": "UNAVAILABLE",
             "workspace": workspace,

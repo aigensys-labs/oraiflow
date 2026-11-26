@@ -1,4 +1,5 @@
 """Small deterministic helpers for synthetic demo seed adjustments."""
+
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
@@ -12,7 +13,9 @@ def parse_demo_salary_amount_minor(value: str | None) -> int:
     try:
         amount = int(raw)
     except (TypeError, ValueError) as exc:
-        raise ValueError("DEMO_SALARY_AMOUNT_MINOR must be a positive integer in minor units") from exc
+        raise ValueError(
+            "DEMO_SALARY_AMOUNT_MINOR must be a positive integer in minor units"
+        ) from exc
     if amount <= 0:
         raise ValueError("DEMO_SALARY_AMOUNT_MINOR must be a positive integer in minor units")
     return amount
@@ -84,21 +87,30 @@ def build_demo_transaction_history(
         raise ValueError("Synthetic salary amount must be a positive integer in minor units")
     safe_employer = str(employer or "Northstar Labs").strip() or "Northstar Labs"
     rows: list[dict[str, object]] = []
-    for transaction_id, account_id, description, category, amount_or_kind, days_ago in DEMO_HISTORY_ROWS:
+    for (
+        transaction_id,
+        account_id,
+        description,
+        category,
+        amount_or_kind,
+        days_ago,
+    ) in DEMO_HISTORY_ROWS:
         if amount_or_kind == "salary":
             description = str(description).format(employer=safe_employer)
             amount_minor = salary_minor
         else:
             amount_minor = int(amount_or_kind)
-        rows.append({
-            "transaction_id": transaction_id,
-            "account_id": account_id,
-            "description": description,
-            "category": category,
-            "amount_minor": amount_minor,
-            "currency": "EUR",
-            "status": "BOOKED",
-            "occurred_at": current - timedelta(days=int(days_ago)),
-            "days_ago": int(days_ago),
-        })
+        rows.append(
+            {
+                "transaction_id": transaction_id,
+                "account_id": account_id,
+                "description": description,
+                "category": category,
+                "amount_minor": amount_minor,
+                "currency": "EUR",
+                "status": "BOOKED",
+                "occurred_at": current - timedelta(days=int(days_ago)),
+                "days_ago": int(days_ago),
+            }
+        )
     return rows

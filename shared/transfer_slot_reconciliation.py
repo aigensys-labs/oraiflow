@@ -6,6 +6,7 @@ customer message. Account names are matched against the application account
 catalogue, then independently source-anchored by the interpretation gate and
 re-verified through MCP before a transfer draft can open.
 """
+
 from __future__ import annotations
 
 import re
@@ -17,8 +18,6 @@ from shared.contact_resolution import extract_contact_transfer_request
 def _normalise_name(value: Any) -> str:
     text = str(value or "").casefold().replace("\u00a0", " ")
     return " ".join(re.sub(r"[^\w]+", " ", text, flags=re.UNICODE).split())
-
-
 
 
 def _recipient_is_mentioned(text: str, recipient: str) -> bool:
@@ -54,7 +53,11 @@ def _explicit_source_account(text: str, context: dict[str, Any]) -> str | None:
             alias_tokens = _normalise_name(alias).split()
             if not alias_tokens:
                 continue
-            alias_pattern = r"(?<![\w])" + r"[\W_]+".join(re.escape(token) for token in alias_tokens) + r"(?![\w])"
+            alias_pattern = (
+                r"(?<![\w])"
+                + r"[\W_]+".join(re.escape(token) for token in alias_tokens)
+                + r"(?![\w])"
+            )
             pattern = (
                 r"\b(?:from|using|out of)\s+(?:my|the)\s+(?:" + alias_pattern + r")\b|"
                 r"\b(?:from|using|out of)\s+(?:" + alias_pattern + r")\b"
@@ -92,10 +95,13 @@ def reconcile_explicit_transfer_slots(
     # we may still preserve an account explicitly named in the same turn. The
     # proposed recipient must independently appear as a whole phrase.
     parsed_matches = bool(
-        parsed and _normalise_name(parsed.get("beneficiary_query"))
+        parsed
+        and _normalise_name(parsed.get("beneficiary_query"))
         == _normalise_name(proposed_recipient_query)
     )
-    if not parsed_matches and not _recipient_is_mentioned(current_customer_text, proposed_recipient_query):
+    if not parsed_matches and not _recipient_is_mentioned(
+        current_customer_text, proposed_recipient_query
+    ):
         return []
 
     slots = assessment.get("slots")

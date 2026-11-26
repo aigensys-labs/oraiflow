@@ -4,6 +4,7 @@ This is an educational snapshot of data held by ORAIflow, not a credit score,
 creditworthiness decision, or a complete household balance sheet. It includes
 active deposit-account balances and registered loan liabilities only.
 """
+
 from __future__ import annotations
 
 from collections import defaultdict
@@ -23,9 +24,12 @@ def _as_minor(value: Any) -> int:
 def _bps(numerator: int, denominator: int) -> int | None:
     if denominator <= 0:
         return None
-    return int((Decimal(numerator) * Decimal(10_000) / Decimal(denominator)).quantize(
-        Decimal("1"), rounding=ROUND_HALF_UP,
-    ))
+    return int(
+        (Decimal(numerator) * Decimal(10_000) / Decimal(denominator)).quantize(
+            Decimal("1"),
+            rounding=ROUND_HALF_UP,
+        )
+    )
 
 
 def _status_for_debt_to_assets(debt_to_assets_bps: int | None, *, assets_minor: int) -> str:
@@ -58,9 +62,13 @@ def calculate_recorded_financial_health(
     principal from the registered loan catalogue is treated as loan liability.
     Only the authenticated records supplied by the caller may be passed in.
     """
-    balances: dict[str, dict[str, int]] = defaultdict(lambda: {
-        "assets": 0, "overdrafts": 0, "loans": 0,
-    })
+    balances: dict[str, dict[str, int]] = defaultdict(
+        lambda: {
+            "assets": 0,
+            "overdrafts": 0,
+            "loans": 0,
+        }
+    )
 
     for account in accounts:
         currency = str(account.get("currency") or "").strip().upper()
@@ -83,7 +91,9 @@ def calculate_recorded_financial_health(
         # records remain eligible regardless of that demonstration switch.
         if loan.get("demo_only") is True and not include_demo_loans:
             continue
-        outstanding = max(0, _as_minor(loan.get("outstanding_principal_minor", loan.get("principal_minor"))))
+        outstanding = max(
+            0, _as_minor(loan.get("outstanding_principal_minor", loan.get("principal_minor")))
+        )
         balances[currency]["loans"] += outstanding
 
     positions: list[dict[str, Any]] = []
@@ -97,26 +107,42 @@ def calculate_recorded_financial_health(
         debt_to_assets = _bps(total_debt, assets)
         debt_to_equity = _bps(loan_liabilities, equity) if equity > 0 else None
         status = _status_for_debt_to_assets(debt_to_assets, assets_minor=assets)
-        positions.append({
-            "currency": currency,
-            "recorded_deposit_assets_minor": assets,
-            "loan_liabilities_minor": loan_liabilities,
-            "overdraft_liabilities_minor": overdrafts,
-            "total_recorded_liabilities_minor": total_debt,
-            "recorded_equity_minor": equity,
-            "loan_to_equity_bps": debt_to_equity,
-            "debt_to_assets_bps": debt_to_assets,
-            "status": status,
-            "status_basis": "TOTAL_RECORDED_LIABILITIES_TO_RECORDED_DEPOSIT_ASSETS",
-        })
+        positions.append(
+            {
+                "currency": currency,
+                "recorded_deposit_assets_minor": assets,
+                "loan_liabilities_minor": loan_liabilities,
+                "overdraft_liabilities_minor": overdrafts,
+                "total_recorded_liabilities_minor": total_debt,
+                "recorded_equity_minor": equity,
+                "loan_to_equity_bps": debt_to_equity,
+                "debt_to_assets_bps": debt_to_assets,
+                "status": status,
+                "status_basis": "TOTAL_RECORDED_LIABILITIES_TO_RECORDED_DEPOSIT_ASSETS",
+            }
+        )
 
     return {
         "methodology_version": METHODOLOGY_VERSION,
         "positions": positions,
         "coverage": {
-            "included": ["active ORAIflow deposit accounts", "registered non-demo loan outstanding principal"]
-                + (["opt-in illustrative demo loan outstanding principal"] if include_demo_loans else []),
-            "excluded": ["property", "external bank accounts", "investments", "pensions", "unrecorded debts", "income and monthly debt service"],
+            "included": [
+                "active ORAIflow deposit accounts",
+                "registered non-demo loan outstanding principal",
+            ]
+            + (
+                ["opt-in illustrative demo loan outstanding principal"]
+                if include_demo_loans
+                else []
+            ),
+            "excluded": [
+                "property",
+                "external bank accounts",
+                "investments",
+                "pensions",
+                "unrecorded debts",
+                "income and monthly debt service",
+            ],
             "is_complete_household_balance_sheet": False,
             "is_credit_score": False,
             "status_thresholds": {

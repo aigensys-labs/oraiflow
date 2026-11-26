@@ -23,7 +23,8 @@ def _ai(content: str, pending=None):
     from services.agent_runtime.navigation import PENDING_NAVIGATION_KEY
 
     return SimpleNamespace(
-        type="ai", content=content,
+        type="ai",
+        content=content,
         additional_kwargs={PENDING_NAVIGATION_KEY: pending} if pending else {},
     )
 
@@ -44,10 +45,13 @@ def test_received_money_question_discovers_transaction_analysis_candidate():
     assert transaction["auto_resolve"] is False
 
 
-@pytest.mark.parametrize("utterance", [
-    "how much do I spend on coffee each month?",
-    "do I have any spendings on transport?",
-])
+@pytest.mark.parametrize(
+    "utterance",
+    [
+        "how much do I spend on coffee each month?",
+        "do I have any spendings on transport?",
+    ],
+)
 def test_ordinary_spending_paraphrases_surface_transaction_analysis_candidate(utterance):
     candidates = discover_intent_candidates(utterance, limit=8)
     transaction = next(item for item in candidates if item["intent_id"] == "TRANSACTION_ANALYSIS")
@@ -58,7 +62,9 @@ def test_ordinary_spending_paraphrases_surface_transaction_analysis_candidate(ut
 def test_latest_transaction_explanation_is_a_semantic_hint_not_a_transaction_list_or_detail_fast_path():
     utterance = "Explain my latest transaction"
     candidates = discover_intent_candidates(utterance, limit=5)
-    transaction = next(item for item in candidates if item["intent_id"] == "TRANSACTION_EXPLANATION")
+    transaction = next(
+        item for item in candidates if item["intent_id"] == "TRANSACTION_EXPLANATION"
+    )
     assert transaction["match_kind"] == "semantic_phrase"
     assert transaction["auto_resolve"] is False
     assert classify_canonical_read_intent(utterance) is None
@@ -121,7 +127,11 @@ def test_transaction_semantic_selector_accepts_unlisted_paraphrase_with_exact_cu
         slots={"transaction_selector": "latest"},
         evidence=[
             TaskEvidence(field="intent", source="current_turn", quote=utterance),
-            TaskEvidence(field="transaction_selector", source="current_turn", quote="the payment I made most recently"),
+            TaskEvidence(
+                field="transaction_selector",
+                source="current_turn",
+                quote="the payment I made most recently",
+            ),
         ],
     )
     planned = plan_interpreted_task(
@@ -215,7 +225,9 @@ def test_explicit_unsupported_transaction_selector_is_not_replaced_by_latest_def
         slots={"transaction_selector": "first"},
         evidence=[
             TaskEvidence(field="intent", source="current_turn", quote=utterance),
-            TaskEvidence(field="transaction_selector", source="current_turn", quote="first transaction"),
+            TaskEvidence(
+                field="transaction_selector", source="current_turn", quote="first transaction"
+            ),
         ],
     )
     planned = plan_interpreted_task(
@@ -253,15 +265,20 @@ def test_financial_health_uses_customer_labels_without_claiming_a_trend_or_chang
     }
     for status, expected in labels.items():
         text = render_financial_health_explanation(
-            {"positions": [{
-                "currency": "EUR", "status": status,
-                "recorded_equity_minor": 100_000,
-                "recorded_deposit_assets_minor": 200_000,
-                "total_recorded_liabilities_minor": 100_000,
-                "loan_liabilities_minor": 100_000,
-                "loan_to_equity_bps": 10_000,
-                "debt_to_assets_bps": 5_000,
-            }]},
+            {
+                "positions": [
+                    {
+                        "currency": "EUR",
+                        "status": status,
+                        "recorded_equity_minor": 100_000,
+                        "recorded_deposit_assets_minor": 200_000,
+                        "total_recorded_liabilities_minor": 100_000,
+                        "loan_liabilities_minor": 100_000,
+                        "loan_to_equity_bps": 10_000,
+                        "debt_to_assets_bps": 5_000,
+                    }
+                ]
+            },
             "explain my financial health",
         )
         assert expected in text
@@ -281,10 +298,15 @@ def test_academy_pronoun_navigation_resolves_only_a_unique_preceding_workspace_r
         _human("What is Academy?", "human-1"),
         _ai("Academy is the learning workspace where you can explore financial concepts."),
         _human("go to", "human-2"),
-        _ai("Which ORAIflow workspace would you like me to open? Available workspaces: Overview, Accounts, Academy."),
+        _ai(
+            "Which ORAIflow workspace would you like me to open? Available workspaces: Overview, Accounts, Academy."
+        ),
         _human("show me its page", "human-3"),
     ]
-    assert resolve_workspace_request("show me its page", messages=after_navigation_clarification) == "Academy"
+    assert (
+        resolve_workspace_request("show me its page", messages=after_navigation_clarification)
+        == "Academy"
+    )
 
     controls = [
         _human("What is Controls & audit?", "human-4"),
@@ -326,20 +348,30 @@ async def test_long_academy_credit_score_explanation_is_chunked_by_existing_agui
 
     explanation = academy_direct_guidance_for_request("What is my current scoring?")
     assert explanation and len(explanation) > 100
-    start = SimpleNamespace(type=SimpleNamespace(value="TEXT_MESSAGE_START"), message_id="academy-1", role="assistant")
-    content = SimpleNamespace(type=SimpleNamespace(value="TEXT_MESSAGE_CONTENT"), message_id="academy-1", role="assistant", delta=explanation)
-    end = SimpleNamespace(type=SimpleNamespace(value="TEXT_MESSAGE_END"), message_id="academy-1", role="assistant")
+    start = SimpleNamespace(
+        type=SimpleNamespace(value="TEXT_MESSAGE_START"), message_id="academy-1", role="assistant"
+    )
+    content = SimpleNamespace(
+        type=SimpleNamespace(value="TEXT_MESSAGE_CONTENT"),
+        message_id="academy-1",
+        role="assistant",
+        delta=explanation,
+    )
+    end = SimpleNamespace(
+        type=SimpleNamespace(value="TEXT_MESSAGE_END"), message_id="academy-1", role="assistant"
+    )
 
     async def source():
         yield start
         yield content
         yield end
 
-    streamed = [item async for item in stream_text_events(source(), target_chars=24, delay_seconds=0)]
+    streamed = [
+        item async for item in stream_text_events(source(), target_chars=24, delay_seconds=0)
+    ]
     chunks = [item for item in streamed if "TEXT_MESSAGE_CONTENT" in item.type.value]
     assert len(chunks) > 1
     assert "".join(item.delta for item in chunks) == explanation
-
 
 
 def test_monthly_coffee_question_compiles_month_grouping_and_ninety_day_window():
@@ -371,15 +403,18 @@ def test_monthly_coffee_question_compiles_month_grouping_and_ninety_day_window()
     assert planned["arguments"]["flow"] == "outflows"
 
 
-@pytest.mark.parametrize("grouping_phrase", [
-    "by month",
-    "by months",
-    "each month",
-    "every month",
-    "month by month",
-    "month-by-month",
-    "monthly",
-])
+@pytest.mark.parametrize(
+    "grouping_phrase",
+    [
+        "by month",
+        "by months",
+        "each month",
+        "every month",
+        "month by month",
+        "month-by-month",
+        "monthly",
+    ],
+)
 def test_coffee_month_grouping_phrases_never_leak_into_merchant_filter(grouping_phrase):
     utterance = f"How much do I spend on coffee {grouping_phrase}?"
     task = InterpretedTask(

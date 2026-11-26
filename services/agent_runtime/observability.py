@@ -1,4 +1,5 @@
 """Privacy-safe correlation context shared by Agent Runtime async stages."""
+
 from __future__ import annotations
 
 from contextvars import ContextVar

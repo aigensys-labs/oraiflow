@@ -18,15 +18,28 @@ from shared.transfer_workflow import (
     resolve_source_account_reply,
 )
 
-
 ACCOUNTS = [
     {"account_id": "acc-001", "account_name": "Everyday account", "currency": "EUR"},
     {"account_id": "acc-002", "account_name": "Savings account", "currency": "EUR"},
     {"account_id": "acc-003", "account_name": "Travel wallet", "currency": "EUR"},
 ]
 CONTACTS = [
-    {"contact_id": "ct-john-carter", "full_name": "John Carter", "bank_name": "Northstar Bank", "account_reference_masked": "DEMO ···· 1042", "currency": "EUR", "status": "ACTIVE"},
-    {"contact_id": "ct-john-mitchell", "full_name": "John Mitchell", "bank_name": "Union Financial", "account_reference_masked": "DEMO ···· 2781", "currency": "EUR", "status": "ACTIVE"},
+    {
+        "contact_id": "ct-john-carter",
+        "full_name": "John Carter",
+        "bank_name": "Northstar Bank",
+        "account_reference_masked": "DEMO ···· 1042",
+        "currency": "EUR",
+        "status": "ACTIVE",
+    },
+    {
+        "contact_id": "ct-john-mitchell",
+        "full_name": "John Mitchell",
+        "bank_name": "Union Financial",
+        "account_reference_masked": "DEMO ···· 2781",
+        "currency": "EUR",
+        "status": "ACTIVE",
+    },
 ]
 CONTEXT = {"accounts": ACCOUNTS, "contacts": CONTACTS, "selected_account_id": None}
 
@@ -94,7 +107,9 @@ def test_comparative_preference_is_not_overridden_by_existing_ui_selection():
     workflow = make_workflow()
     _, workflow = resolve_search_result(workflow, [CONTACTS[0]], CONTEXT)
     context_with_selection = {**CONTEXT, "selected_account_id": "acc-001"}
-    status, updated = resolve_source_account_reply(workflow, "with the highest amount", context_with_selection)
+    status, updated = resolve_source_account_reply(
+        workflow, "with the highest amount", context_with_selection
+    )
     assert status == "NEEDS_VERIFIED_BALANCE"
     assert updated["stage"] == "RESOLVING_SOURCE_ACCOUNT"
     assert updated["account_resolution_reason"] == "NEEDS_VERIFIED_BALANCE_MAX"
@@ -111,12 +126,32 @@ def test_highest_amount_one_resolves_pending_transfer_through_verified_balance_r
     assert resolving["source_account_preference"] == "highest_balance"
 
     verified_accounts = [
-        {"account_id": "acc-001", "account_name": "Everyday account", "currency": "EUR", "status": "ACTIVE", "balance_minor": 2_013_080},
-        {"account_id": "acc-002", "account_name": "Savings account", "currency": "EUR", "status": "ACTIVE", "balance_minor": 860_000},
-        {"account_id": "acc-003", "account_name": "Travel wallet", "currency": "EUR", "status": "ACTIVE", "balance_minor": 248_750},
+        {
+            "account_id": "acc-001",
+            "account_name": "Everyday account",
+            "currency": "EUR",
+            "status": "ACTIVE",
+            "balance_minor": 2_013_080,
+        },
+        {
+            "account_id": "acc-002",
+            "account_name": "Savings account",
+            "currency": "EUR",
+            "status": "ACTIVE",
+            "balance_minor": 860_000,
+        },
+        {
+            "account_id": "acc-003",
+            "account_name": "Travel wallet",
+            "currency": "EUR",
+            "status": "ACTIVE",
+            "balance_minor": 248_750,
+        },
     ]
     status, ready = apply_verified_account_ranking(
-        resolving, CONTEXT, verified_accounts,
+        resolving,
+        CONTEXT,
+        verified_accounts,
     )
     assert status == "READY_FOR_DRAFT"
     assert ready["source_account_id"] == "acc-001"
@@ -128,9 +163,24 @@ def test_highest_balance_preference_is_resolved_only_from_verified_mcp_accounts(
     status, workflow = resolve_search_result(workflow, [CONTACTS[0]], CONTEXT)
     assert status == "NEEDS_VERIFIED_BALANCE"
     verified = [
-        {"account_id": "acc-001", "account_name": "Everyday account", "currency": "EUR", "balance_minor": 1242980},
-        {"account_id": "acc-002", "account_name": "Savings account", "currency": "EUR", "balance_minor": 865000},
-        {"account_id": "acc-003", "account_name": "Travel wallet", "currency": "EUR", "balance_minor": 248750},
+        {
+            "account_id": "acc-001",
+            "account_name": "Everyday account",
+            "currency": "EUR",
+            "balance_minor": 1242980,
+        },
+        {
+            "account_id": "acc-002",
+            "account_name": "Savings account",
+            "currency": "EUR",
+            "balance_minor": 865000,
+        },
+        {
+            "account_id": "acc-003",
+            "account_name": "Travel wallet",
+            "currency": "EUR",
+            "balance_minor": 248750,
+        },
     ]
     status, workflow = apply_verified_account_ranking(workflow, CONTEXT, verified)
     assert status == "READY_FOR_DRAFT"
@@ -141,9 +191,24 @@ def test_highest_balance_tie_requires_customer_choice():
     workflow = make_workflow(source_account_preference="highest_balance")
     _, workflow = resolve_search_result(workflow, [CONTACTS[0]], CONTEXT)
     verified = [
-        {"account_id": "acc-001", "account_name": "Everyday account", "currency": "EUR", "balance_minor": 1000},
-        {"account_id": "acc-002", "account_name": "Savings account", "currency": "EUR", "balance_minor": 1000},
-        {"account_id": "acc-003", "account_name": "Travel wallet", "currency": "EUR", "balance_minor": 500},
+        {
+            "account_id": "acc-001",
+            "account_name": "Everyday account",
+            "currency": "EUR",
+            "balance_minor": 1000,
+        },
+        {
+            "account_id": "acc-002",
+            "account_name": "Savings account",
+            "currency": "EUR",
+            "balance_minor": 1000,
+        },
+        {
+            "account_id": "acc-003",
+            "account_name": "Travel wallet",
+            "currency": "EUR",
+            "balance_minor": 500,
+        },
     ]
     status, workflow = apply_verified_account_ranking(workflow, CONTEXT, verified)
     assert status == "AWAITING_SOURCE_ACCOUNT"
@@ -164,40 +229,72 @@ def test_frontend_draft_result_is_terminal_and_dismissal_is_recorded():
     _, workflow = resolve_source_account_reply(workflow, "Everyday", CONTEXT)
     workflow["action_id"] = "act-test-12345678"
     workflow["workflow_id"] = "trf-test-12345678"
-    opened = apply_frontend_draft_result(workflow, {"status": "draft_opened", "workflow_id": "trf-test-12345678", "action_id": "act-test-12345678"})
+    opened = apply_frontend_draft_result(
+        workflow,
+        {
+            "status": "draft_opened",
+            "workflow_id": "trf-test-12345678",
+            "action_id": "act-test-12345678",
+        },
+    )
     assert opened["stage"] == "DRAFT_OPENED"
-    dismissed = apply_frontend_dismissal(opened, {
-        "workflow_id": "trf-test-12345678",
-        "action_id": "act-test-12345678",
-        "status": "dismissed",
-    })
+    dismissed = apply_frontend_dismissal(
+        opened,
+        {
+            "workflow_id": "trf-test-12345678",
+            "action_id": "act-test-12345678",
+            "status": "dismissed",
+        },
+    )
     assert dismissed["stage"] == "DISMISSED"
 
 
 def test_frontend_dismissal_cannot_apply_to_a_different_action():
     workflow = make_workflow()
-    workflow.update({"workflow_id": "trf-a-12345678", "action_id": "act-a-12345678", "stage": "DRAFT_OPENED"})
-    unchanged = apply_frontend_dismissal(workflow, {
-        "workflow_id": "trf-a-12345678", "action_id": "act-b-12345678", "status": "dismissed",
-    })
+    workflow.update(
+        {"workflow_id": "trf-a-12345678", "action_id": "act-a-12345678", "stage": "DRAFT_OPENED"}
+    )
+    unchanged = apply_frontend_dismissal(
+        workflow,
+        {
+            "workflow_id": "trf-a-12345678",
+            "action_id": "act-b-12345678",
+            "status": "dismissed",
+        },
+    )
     assert unchanged["stage"] == "DRAFT_OPENED"
 
 
 def test_frontend_draft_receipt_must_match_both_workflow_and_action_ids():
     workflow = make_workflow()
-    workflow.update({"workflow_id": "trf-expected-123", "action_id": "act-expected-123", "stage": "DRAFT_REQUESTED"})
-    mismatched = apply_frontend_draft_result(workflow, {
-        "status": "draft_opened",
-        "workflow_id": "trf-other-123",
-        "action_id": "act-expected-123",
-    })
+    workflow.update(
+        {
+            "workflow_id": "trf-expected-123",
+            "action_id": "act-expected-123",
+            "stage": "DRAFT_REQUESTED",
+        }
+    )
+    mismatched = apply_frontend_draft_result(
+        workflow,
+        {
+            "status": "draft_opened",
+            "workflow_id": "trf-other-123",
+            "action_id": "act-expected-123",
+        },
+    )
     assert mismatched["stage"] == "DRAFT_REJECTED"
     assert mismatched["last_action_status"] == "rejected"
 
 
 def test_frontend_draft_receipt_without_ids_cannot_open_workflow():
     workflow = make_workflow()
-    workflow.update({"workflow_id": "trf-expected-456", "action_id": "act-expected-456", "stage": "DRAFT_REQUESTED"})
+    workflow.update(
+        {
+            "workflow_id": "trf-expected-456",
+            "action_id": "act-expected-456",
+            "stage": "DRAFT_REQUESTED",
+        }
+    )
     missing_ids = apply_frontend_draft_result(workflow, {"status": "draft_opened"})
     assert missing_ids["stage"] == "DRAFT_REJECTED"
 
@@ -215,8 +312,11 @@ def test_missing_currency_preserves_slots_and_asks_currency_and_source_together(
     assert workflow["beneficiary_query"] == "Lucas"
 
     lucas = {
-        "contact_id": "ct-lucas-meyer", "full_name": "Lucas Meyer",
-        "bank_name": "Meridian Bank", "currency": "EUR", "status": "ACTIVE",
+        "contact_id": "ct-lucas-meyer",
+        "full_name": "Lucas Meyer",
+        "bank_name": "Meridian Bank",
+        "currency": "EUR",
+        "status": "ACTIVE",
     }
     status, workflow = resolve_search_result(workflow, [lucas], context_with_selected_eur_account)
     assert status == "AWAITING_CURRENCY"
@@ -240,8 +340,11 @@ def test_confirming_recipient_currency_advances_to_source_account_without_losing
         "entities": {"beneficiary": "Lucas"},
     }
     lucas = {
-        "contact_id": "ct-lucas-meyer", "full_name": "Lucas Meyer",
-        "bank_name": "Meridian Bank", "currency": "EUR", "status": "ACTIVE",
+        "contact_id": "ct-lucas-meyer",
+        "full_name": "Lucas Meyer",
+        "bank_name": "Meridian Bank",
+        "currency": "EUR",
+        "status": "ACTIVE",
     }
     workflow = build_transfer_workflow(assessment, CONTEXT)
     _, workflow = resolve_search_result(workflow, [lucas], CONTEXT)
@@ -258,7 +361,12 @@ def test_explicit_currency_must_match_saved_recipient_currency():
         "slots": {"amount": "50"},
         "entities": {"beneficiary": "Lucas"},
     }
-    lucas = {"contact_id": "ct-lucas-meyer", "full_name": "Lucas Meyer", "currency": "EUR", "status": "ACTIVE"}
+    lucas = {
+        "contact_id": "ct-lucas-meyer",
+        "full_name": "Lucas Meyer",
+        "currency": "EUR",
+        "status": "ACTIVE",
+    }
     workflow = build_transfer_workflow(assessment, CONTEXT)
     _, workflow = resolve_search_result(workflow, [lucas], CONTEXT)
     status, workflow = resolve_currency_reply(workflow, "USD", CONTEXT)
@@ -297,7 +405,12 @@ def test_comparative_account_preference_waits_for_contact_and_currency_first():
         "slots": {"amount": "70", "source_account_preference": "highest_balance"},
         "entities": {"beneficiary": "Lucas"},
     }
-    lucas = {"contact_id": "ct-lucas", "full_name": "Lucas Meyer", "currency": "EUR", "status": "ACTIVE"}
+    lucas = {
+        "contact_id": "ct-lucas",
+        "full_name": "Lucas Meyer",
+        "currency": "EUR",
+        "status": "ACTIVE",
+    }
     workflow = build_transfer_workflow(assessment, CONTEXT)
     assert workflow["stage"] == "CONTACT_SEARCH_PENDING"
 
@@ -400,11 +513,13 @@ def test_draft_opened_is_a_completed_pending_task_not_a_live_clarification():
     from shared.pending_task import pending_task_from_message
 
     workflow = make_workflow()
-    workflow.update({
-        "stage": "DRAFT_OPENED",
-        "workflow_id": "trf-opened-test",
-        "action_id": "act-opened-test",
-    })
+    workflow.update(
+        {
+            "stage": "DRAFT_OPENED",
+            "workflow_id": "trf-opened-test",
+            "action_id": "act-opened-test",
+        }
+    )
     message = SimpleNamespace(type="ai", content="Your draft is open.", additional_kwargs={})
     with_workflow(message, workflow)
 
@@ -438,9 +553,12 @@ def test_named_source_account_is_rejected_if_mcp_verification_finds_currency_or_
     workflow = make_workflow()
     _, workflow = resolve_search_result(workflow, [CONTACTS[0]], CONTEXT)
     _, selected = resolve_source_account_reply(workflow, "Everyday", CONTEXT)
-    status, rejected = apply_verified_source_account_selection(selected, [
-        {"account_id": "acc-001", "currency": "USD", "status": "ACTIVE", "balance_minor": 1000},
-    ])
+    status, rejected = apply_verified_source_account_selection(
+        selected,
+        [
+            {"account_id": "acc-001", "currency": "USD", "status": "ACTIVE", "balance_minor": 1000},
+        ],
+    )
     assert status == "AWAITING_SOURCE_ACCOUNT"
     assert rejected.get("source_account_id") == ""
 
@@ -449,9 +567,27 @@ def test_highest_balance_ranking_uses_authenticated_mcp_rows_even_without_browse
     workflow = make_workflow(source_account_preference="highest_balance")
     _, workflow = resolve_search_result(workflow, [CONTACTS[0]], CONTEXT)
     verified = [
-        {"account_id": "acc-001", "account_name": "Everyday account", "currency": "EUR", "status": "ACTIVE", "balance_minor": 12500},
-        {"account_id": "acc-002", "account_name": "Savings account", "currency": "EUR", "status": "ACTIVE", "balance_minor": 865000},
-        {"account_id": "acc-003", "account_name": "Travel wallet", "currency": "EUR", "status": "ACTIVE", "balance_minor": 2500},
+        {
+            "account_id": "acc-001",
+            "account_name": "Everyday account",
+            "currency": "EUR",
+            "status": "ACTIVE",
+            "balance_minor": 12500,
+        },
+        {
+            "account_id": "acc-002",
+            "account_name": "Savings account",
+            "currency": "EUR",
+            "status": "ACTIVE",
+            "balance_minor": 865000,
+        },
+        {
+            "account_id": "acc-003",
+            "account_name": "Travel wallet",
+            "currency": "EUR",
+            "status": "ACTIVE",
+            "balance_minor": 2500,
+        },
     ]
     status, ranked = apply_verified_account_ranking(workflow, {}, verified)
     assert status == "READY_FOR_DRAFT"
@@ -485,8 +621,11 @@ def test_explicit_but_unavailable_source_is_not_replaced_by_selected_or_only_acc
         "selected_account_id": "acc-002",
     }
     lucas = {
-        "contact_id": "ct-lucas-meyer", "full_name": "Lucas Meyer",
-        "bank_name": "Meridian Bank", "currency": "EUR", "status": "ACTIVE",
+        "contact_id": "ct-lucas-meyer",
+        "full_name": "Lucas Meyer",
+        "bank_name": "Meridian Bank",
+        "currency": "EUR",
+        "status": "ACTIVE",
     }
     workflow = build_transfer_workflow(assessment, context)
     status, workflow = resolve_search_result(workflow, [lucas], context)
@@ -496,7 +635,9 @@ def test_explicit_but_unavailable_source_is_not_replaced_by_selected_or_only_acc
     assert status == "AWAITING_SOURCE_ACCOUNT"
     assert workflow.get("source_account_id") in (None, "")
     assert workflow["source_account_query"] == "Everyday account"
-    assert "couldn't match your requested source **Everyday account**" in account_choice_prompt(workflow)
+    assert "couldn't match your requested source **Everyday account**" in account_choice_prompt(
+        workflow
+    )
 
 
 def test_explicit_source_account_survives_currency_confirmation_without_reasking():
@@ -506,8 +647,11 @@ def test_explicit_source_account_survives_currency_confirmation_without_reasking
         "entities": {"beneficiary": "Lucas"},
     }
     lucas = {
-        "contact_id": "ct-lucas-meyer", "full_name": "Lucas Meyer",
-        "bank_name": "Meridian Bank", "currency": "EUR", "status": "ACTIVE",
+        "contact_id": "ct-lucas-meyer",
+        "full_name": "Lucas Meyer",
+        "bank_name": "Meridian Bank",
+        "currency": "EUR",
+        "status": "ACTIVE",
     }
     workflow = build_transfer_workflow(assessment, CONTEXT)
     assert workflow["source_account_query"] == "Everyday account"
@@ -524,9 +668,17 @@ def test_explicit_source_account_survives_currency_confirmation_without_reasking
 
     # The ID is still only a selection candidate until a fresh authenticated
     # MCP account list verifies currency, active status and account identity.
-    status, verified = apply_verified_source_account_selection(workflow, [
-        {"account_id": "acc-001", "currency": "EUR", "status": "ACTIVE", "balance_minor": 2_013_080},
-    ])
+    status, verified = apply_verified_source_account_selection(
+        workflow,
+        [
+            {
+                "account_id": "acc-001",
+                "currency": "EUR",
+                "status": "ACTIVE",
+                "balance_minor": 2_013_080,
+            },
+        ],
+    )
     assert status == "READY_FOR_DRAFT"
     assert verified["stage"] == "READY_FOR_DRAFT"
 
@@ -546,7 +698,11 @@ def test_source_account_slot_must_be_anchored_to_customer_text_and_catalogue():
         "slots": {"amount": "100", "source_account": "Everyday account"},
         "entities": {"beneficiary": "Lucas"},
         "evidence": [
-            {"field": "intent", "source": "current_turn", "quote": "Send 100 to Lucas from everyday"},
+            {
+                "field": "intent",
+                "source": "current_turn",
+                "quote": "Send 100 to Lucas from everyday",
+            },
             {"field": "amount", "source": "current_turn", "quote": "100"},
             {"field": "beneficiary", "source": "current_turn", "quote": "Lucas"},
         ],
@@ -557,11 +713,16 @@ def test_source_account_slot_must_be_anchored_to_customer_text_and_catalogue():
         "application_context": json.dumps({"accounts": ACCOUNTS}),
     }
     validated, decision = validate_interpretation_assessment(
-        payload, expected_capability_id="banking.contacts.search", sources=sources,
+        payload,
+        expected_capability_id="banking.contacts.search",
+        sources=sources,
     )
     assert validated is not None
     assert decision["decision"] == "PASS"
-    assert any(item.field == "source_account" and item.source == "current_turn" for item in validated.evidence)
+    assert any(
+        item.field == "source_account" and item.source == "current_turn"
+        for item in validated.evidence
+    )
 
 
 def test_explicit_transfer_request_enters_the_single_typed_workflow():
@@ -585,7 +746,8 @@ def test_explicit_transfer_without_currency_preserves_beneficiary_and_amount():
 
 def test_explicit_highest_balance_preference_is_normalized_and_not_selected_from_ui_context():
     workflow = build_explicit_transfer_workflow(
-        "send 50 EUR to John from account with the highest amount", CONTEXT,
+        "send 50 EUR to John from account with the highest amount",
+        CONTEXT,
     )
     assert workflow is not None
     assert workflow["amount"] == "50"
@@ -597,7 +759,8 @@ def test_explicit_highest_balance_preference_is_normalized_and_not_selected_from
 
 def test_explicit_highest_balance_preference_survives_ambiguous_john_and_former_reply():
     workflow = build_explicit_transfer_workflow(
-        "send 50 EUR to John from the account with the highest amount", CONTEXT,
+        "send 50 EUR to John from the account with the highest amount",
+        CONTEXT,
     )
     assert workflow is not None
 
@@ -614,7 +777,9 @@ def test_explicit_highest_balance_preference_survives_ambiguous_john_and_former_
 
 
 def test_explicit_account_alias_resolves_against_account_catalogue_only():
-    workflow = build_explicit_transfer_workflow("send 50 EUR to John from Everyday account", CONTEXT)
+    workflow = build_explicit_transfer_workflow(
+        "send 50 EUR to John from Everyday account", CONTEXT
+    )
     assert workflow is not None
     assert workflow["source_account_id"] == "acc-001"
     assert workflow["source_account_preference"] == ""
@@ -624,13 +789,25 @@ def test_latest_pending_transfer_does_not_fall_through_typed_navigation_to_legac
     from types import SimpleNamespace
     from shared.pending_task import PendingTaskContext, attach_pending_task
 
-    stale_workflow = {"workflow_type": "TRANSFER_PREPARATION", "stage": "AWAITING_CONTACT", "workflow_id": "trf-old"}
-    assistant = SimpleNamespace(type="ai", content="Which workspace should I open?", additional_kwargs={})
+    stale_workflow = {
+        "workflow_type": "TRANSFER_PREPARATION",
+        "stage": "AWAITING_CONTACT",
+        "workflow_id": "trf-old",
+    }
+    assistant = SimpleNamespace(
+        type="ai", content="Which workspace should I open?", additional_kwargs={}
+    )
     assistant.additional_kwargs["oraiflow_transfer_workflow"] = stale_workflow
-    attach_pending_task(assistant, PendingTaskContext(
-        task_id="nav-new", domain="navigation", intent_id="WORKSPACE_NAVIGATION",
-        stage="AWAITING_DESTINATION", state={"destination_query": "take me there"},
-    ))
+    attach_pending_task(
+        assistant,
+        PendingTaskContext(
+            task_id="nav-new",
+            domain="navigation",
+            intent_id="WORKSPACE_NAVIGATION",
+            stage="AWAITING_DESTINATION",
+            state={"destination_query": "take me there"},
+        ),
+    )
     assert latest_pending_workflow([assistant]) is None
 
 
@@ -647,7 +824,11 @@ def test_new_explicit_transfer_replaces_an_older_pending_transfer_task():
     assert new is not None
     new_message = SimpleNamespace(type="ai", content="", additional_kwargs={})
     with_workflow(new_message, new)
-    current = [old_message, SimpleNamespace(type="human", content="send 50 EUR to Lucas"), new_message]
+    current = [
+        old_message,
+        SimpleNamespace(type="human", content="send 50 EUR to Lucas"),
+        new_message,
+    ]
     active = latest_pending_workflow(current)
     assert active is not None
     assert active["workflow_id"] == new["workflow_id"]
@@ -657,7 +838,8 @@ def test_new_explicit_transfer_replaces_an_older_pending_transfer_task():
 def test_unknown_explicit_source_account_is_preserved_and_not_replaced_by_selected_account():
     context = {**CONTEXT, "selected_account_id": "acc-001"}
     workflow = build_explicit_transfer_workflow(
-        "send 50 EUR to John from my Holiday account", context,
+        "send 50 EUR to John from my Holiday account",
+        context,
     )
     assert workflow is not None
     assert workflow["source_account_query"] == "my Holiday account"

@@ -12,7 +12,9 @@ def test_demo_loan_is_a_separate_illustrative_liability_with_balanced_schedule()
     assert loan["payment_tracking"] == "NOT_TRACKED"
     assert len(loan["installments"]) == 24
     assert sum(row["principal_minor"] for row in loan["installments"]) == 500_000
-    assert sum(row["interest_minor"] for row in loan["installments"]) == loan["total_interest_minor"]
+    assert (
+        sum(row["interest_minor"] for row in loan["installments"]) == loan["total_interest_minor"]
+    )
     assert loan["total_repayment_minor"] == loan["principal_minor"] + loan["total_interest_minor"]
 
 
@@ -34,7 +36,9 @@ def test_loan_schedule_rejects_invalid_or_non_amortizing_parameters():
 
 def test_zero_apr_loan_is_supported_and_has_no_interest():
     loan = build_demo_loan_record(
-        disbursement_date=date(2026, 11, 23), apr_bps=0, term_months=10,
+        disbursement_date=date(2026, 11, 23),
+        apr_bps=0,
+        term_months=10,
     )
     assert loan["total_interest_minor"] == 0
     assert loan["total_repayment_minor"] == 500_000

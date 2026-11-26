@@ -4,7 +4,10 @@ from services.agent_runtime.intent_contracts import (
     discover_intent_candidates,
     intent_discovery_context,
 )
-from services.agent_runtime.task_interpretation import build_assessment_prompt, task_prompt_catalogue
+from services.agent_runtime.task_interpretation import (
+    build_assessment_prompt,
+    task_prompt_catalogue,
+)
 from shared.contracts.decision_routing import load_decision_routing_policy
 from shared.contracts.registry import get_registry
 
@@ -71,11 +74,14 @@ def test_llm_gets_authoritative_intent_semantics_without_executable_capability_i
     assert "transction" not in prompt.casefold()
 
     latest = next(
-        item for item in intent_discovery_context("what was last transction?")
+        item
+        for item in intent_discovery_context("what was last transction?")
         if item["intent_id"] == "LATEST_TRANSACTION_DETAIL"
     )
     assert "last transaction" in latest["registered_phrases"]
-    assert any(item["workspace_id"] == "Academy" for item in decision_map["resources"]["workspaces"])
+    assert any(
+        item["workspace_id"] == "Academy" for item in decision_map["resources"]["workspaces"]
+    )
     assert len(decision_map["capabilities"]) >= 6
 
 

@@ -37,7 +37,10 @@ def test_does_not_infer_missing_currency_from_account_or_recipient_context():
         assessment,
         current_customer_text="Send 50 to Lucas",
         proposed_recipient_query="Lucas",
-        context={"accounts": [{"account_id": "acc-001", "currency": "EUR"}], "selected_account_id": "acc-001"},
+        context={
+            "accounts": [{"account_id": "acc-001", "currency": "EUR"}],
+            "selected_account_id": "acc-001",
+        },
     )
     assert recovered == []
     assert assessment["slots"] == {"amount": 50}
@@ -85,9 +88,11 @@ def test_reconciles_explicit_source_account_when_recipient_currency_is_missing()
 
 
 def test_reconciles_source_account_from_canonical_alias_with_my_or_out_of_prefix():
-    context = {"accounts": [
-        {"account_id": "acc-003", "account_name": "Travel wallet", "currency": "EUR"},
-    ]}
+    context = {
+        "accounts": [
+            {"account_id": "acc-003", "account_name": "Travel wallet", "currency": "EUR"},
+        ]
+    }
     for text in (
         "Send 100 to Lucas from my travel",
         "Send 100 to Lucas out of the Travel wallet",
@@ -95,30 +100,38 @@ def test_reconciles_source_account_from_canonical_alias_with_my_or_out_of_prefix
     ):
         assessment = _assessment(amount="100")
         recovered = reconcile_explicit_transfer_slots(
-            assessment, current_customer_text=text,
-            proposed_recipient_query="Lucas", context=context,
+            assessment,
+            current_customer_text=text,
+            proposed_recipient_query="Lucas",
+            context=context,
         )
         assert recovered == ["source_account"], text
         assert assessment["slots"]["source_account"] == "Travel wallet"
 
 
 def test_does_not_recover_ambiguous_or_unmentioned_source_account():
-    ambiguous_context = {"accounts": [
-        {"account_id": "acc-001", "account_name": "Everyday account", "currency": "EUR"},
-        {"account_id": "acc-004", "account_name": "Everyday wallet", "currency": "EUR"},
-    ]}
+    ambiguous_context = {
+        "accounts": [
+            {"account_id": "acc-001", "account_name": "Everyday account", "currency": "EUR"},
+            {"account_id": "acc-004", "account_name": "Everyday wallet", "currency": "EUR"},
+        ]
+    }
     assessment = _assessment(amount="100")
     recovered = reconcile_explicit_transfer_slots(
-        assessment, current_customer_text="Send 100 to Lucas from everyday",
-        proposed_recipient_query="Lucas", context=ambiguous_context,
+        assessment,
+        current_customer_text="Send 100 to Lucas from everyday",
+        proposed_recipient_query="Lucas",
+        context=ambiguous_context,
     )
     assert recovered == []
     assert "source_account" not in assessment["slots"]
 
     assessment = _assessment(amount="100")
     recovered = reconcile_explicit_transfer_slots(
-        assessment, current_customer_text="Send 100 to Lucas",
-        proposed_recipient_query="Lucas", context=ambiguous_context,
+        assessment,
+        current_customer_text="Send 100 to Lucas",
+        proposed_recipient_query="Lucas",
+        context=ambiguous_context,
     )
     assert recovered == []
     assert "source_account" not in assessment["slots"]
@@ -159,8 +172,10 @@ def test_send_100_to_lucas_from_everyday_needs_only_recipient_currency_confirmat
         ],
     }
     recovered = reconcile_explicit_transfer_slots(
-        assessment, current_customer_text=customer_text,
-        proposed_recipient_query="Lucas", context=context,
+        assessment,
+        current_customer_text=customer_text,
+        proposed_recipient_query="Lucas",
+        context=context,
     )
     assert recovered == ["source_account"]
     validated, decision = validate_interpretation_assessment(
@@ -176,8 +191,10 @@ def test_send_100_to_lucas_from_everyday_needs_only_recipient_currency_confirmat
 
     workflow = build_transfer_workflow(validated.model_dump(), context)
     lucas = {
-        "contact_id": "ct-lucas-meyer", "full_name": "Lucas Meyer",
-        "currency": "EUR", "status": "ACTIVE",
+        "contact_id": "ct-lucas-meyer",
+        "full_name": "Lucas Meyer",
+        "currency": "EUR",
+        "status": "ACTIVE",
     }
     status, workflow = resolve_search_result(workflow, [lucas], context)
     assert status == "AWAITING_CURRENCY"
@@ -187,8 +204,16 @@ def test_send_100_to_lucas_from_everyday_needs_only_recipient_currency_confirmat
     assert status == "VERIFY_SOURCE_ACCOUNT"
     assert workflow["source_account_id"] == "acc-001"
 
-    status, workflow = apply_verified_source_account_selection(workflow, [
-        {"account_id": "acc-001", "currency": "EUR", "status": "ACTIVE", "balance_minor": 2_013_080},
-    ])
+    status, workflow = apply_verified_source_account_selection(
+        workflow,
+        [
+            {
+                "account_id": "acc-001",
+                "currency": "EUR",
+                "status": "ACTIVE",
+                "balance_minor": 2_013_080,
+            },
+        ],
+    )
     assert status == "READY_FOR_DRAFT"
     assert workflow["stage"] == "READY_FOR_DRAFT"

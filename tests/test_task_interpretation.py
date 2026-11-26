@@ -21,19 +21,21 @@ def test_assessment_contract_is_versioned_and_rejects_unknown_fields():
     payload = {
         "schema_version": "1.0.0",
         "resolution": "RESOLVED",
-        "tasks": [{
-            "intent_id": "LOAN_INFORMATION",
-            "requested_outcome": "EXPLANATION",
-            "resolution": "READY",
-            "slots": {},
-            "entities": {},
-            "evidence": [],
-            "intent_confidence": 0.9,
-            "slot_confidence": None,
-            "entity_confidence": None,
-            "clarification_question": None,
-            "conversation_references": [],
-        }],
+        "tasks": [
+            {
+                "intent_id": "LOAN_INFORMATION",
+                "requested_outcome": "EXPLANATION",
+                "resolution": "READY",
+                "slots": {},
+                "entities": {},
+                "evidence": [],
+                "intent_confidence": 0.9,
+                "slot_confidence": None,
+                "entity_confidence": None,
+                "clarification_question": None,
+                "conversation_references": [],
+            }
+        ],
     }
     parsed, info = parse_assessment_json(json.dumps(payload))
     assert parsed is not None
@@ -55,7 +57,9 @@ def test_assessment_only_contract_contains_no_capability_selection():
 def test_runtime_maps_intents_to_registered_capabilities_not_model_choice():
     registry = get_registry()
     assert intent_validation_capability("LOAN_INFORMATION", registry) == "banking.loans.overview"
-    assert intent_validation_capability("TRANSFER_PREPARATION", registry) == "banking.contacts.search"
+    assert (
+        intent_validation_capability("TRANSFER_PREPARATION", registry) == "banking.contacts.search"
+    )
     assert intent_validation_capability("ACCOUNT_OVERVIEW", registry) == "banking.accounts.list"
     plan = task_capability_plan("FINANCIAL_HEALTH_EXPLANATION", registry)
     assert plan["capability_id"] == "banking.financial_health.overview"
@@ -68,13 +72,26 @@ def test_conversation_references_must_resolve_to_actual_message_ids():
     )
     messages = [SimpleNamespace(id="message-1"), SimpleNamespace(id="message-2")]
     assert allowed_conversation_references(task, messages)
-    assert not allowed_conversation_references(task, [SimpleNamespace(id="message-2"), SimpleNamespace(id="message-3")])
+    assert not allowed_conversation_references(
+        task, [SimpleNamespace(id="message-2"), SimpleNamespace(id="message-3")]
+    )
 
 
 def test_prompt_catalogue_is_semantic_only_and_registry_backed():
     catalogue = task_prompt_catalogue()
     assert catalogue
-    assert all({"intent_id", "description", "response_mode", "examples", "keywords", "required_slots", "required_entities"}.issubset(item) for item in catalogue)
+    assert all(
+        {
+            "intent_id",
+            "description",
+            "response_mode",
+            "examples",
+            "keywords",
+            "required_slots",
+            "required_entities",
+        }.issubset(item)
+        for item in catalogue
+    )
     assert {item["intent_id"] for item in catalogue} == set(get_registry()["intents"])
     transfer = next(item for item in catalogue if item["intent_id"] == "TRANSFER_PREPARATION")
     assert "send money to" in transfer["examples"]
@@ -93,7 +110,9 @@ def test_planner_uses_registry_capability_for_loan_read_without_model_capability
     planned = plan_interpreted_task(
         task,
         sources={"current_turn": "Walk me through my loan schedule."},
-        messages=[SimpleNamespace(type="human", id="turn-1", content="Walk me through my loan schedule.")],
+        messages=[
+            SimpleNamespace(type="human", id="turn-1", content="Walk me through my loan schedule.")
+        ],
         context={},
     )
     assert planned["status"] == "PLANNED"
@@ -119,43 +138,61 @@ def test_planner_refuses_transfer_when_recipient_is_not_grounded():
         context={},
     )
     assert planned["status"] == "CLARIFICATION_REQUIRED"
-    assert planned["reason_code"] in {"VALUE_EVIDENCE_MISSING", "REQUIRED_INPUT_MISSING", "BENEFICIARY_NOT_EXTRACTED"}
+    assert planned["reason_code"] in {
+        "VALUE_EVIDENCE_MISSING",
+        "REQUIRED_INPUT_MISSING",
+        "BENEFICIARY_NOT_EXTRACTED",
+    }
 
 
 def test_missing_field_evidence_identifies_proposed_slots_without_quotations():
     assessment = TurnInterpretationAssessment(
         resolution="RESOLVED",
-        tasks=[InterpretedTask(
-            intent_id="TRANSACTION_ANALYSIS",
-            slots={"period": "this_month", "flow": "outflows"},
-            entities={"merchant_query": "coffee"},
-            evidence=[
-                TaskEvidence(field="intent", source="current_turn", quote="How much did I spend on coffee this month?"),
-                TaskEvidence(field="merchant_query", source="current_turn", quote="coffee"),
-            ],
-        )],
+        tasks=[
+            InterpretedTask(
+                intent_id="TRANSACTION_ANALYSIS",
+                slots={"period": "this_month", "flow": "outflows"},
+                entities={"merchant_query": "coffee"},
+                evidence=[
+                    TaskEvidence(
+                        field="intent",
+                        source="current_turn",
+                        quote="How much did I spend on coffee this month?",
+                    ),
+                    TaskEvidence(field="merchant_query", source="current_turn", quote="coffee"),
+                ],
+            )
+        ],
     )
-    assert missing_task_field_evidence(assessment) == [{
-        "task_index": 0,
-        "intent_id": "TRANSACTION_ANALYSIS",
-        "fields": ["flow", "period"],
-    }]
+    assert missing_task_field_evidence(assessment) == [
+        {
+            "task_index": 0,
+            "intent_id": "TRANSACTION_ANALYSIS",
+            "fields": ["flow", "period"],
+        }
+    ]
 
 
 def test_complete_field_evidence_does_not_trigger_repair():
     assessment = TurnInterpretationAssessment(
         resolution="RESOLVED",
-        tasks=[InterpretedTask(
-            intent_id="TRANSACTION_ANALYSIS",
-            slots={"period": "this_month", "flow": "outflows"},
-            entities={"merchant_query": "coffee"},
-            evidence=[
-                TaskEvidence(field="intent", source="current_turn", quote="How much did I spend on coffee this month?"),
-                TaskEvidence(field="period", source="current_turn", quote="this month"),
-                TaskEvidence(field="flow", source="current_turn", quote="spend"),
-                TaskEvidence(field="merchant_query", source="current_turn", quote="coffee"),
-            ],
-        )],
+        tasks=[
+            InterpretedTask(
+                intent_id="TRANSACTION_ANALYSIS",
+                slots={"period": "this_month", "flow": "outflows"},
+                entities={"merchant_query": "coffee"},
+                evidence=[
+                    TaskEvidence(
+                        field="intent",
+                        source="current_turn",
+                        quote="How much did I spend on coffee this month?",
+                    ),
+                    TaskEvidence(field="period", source="current_turn", quote="this month"),
+                    TaskEvidence(field="flow", source="current_turn", quote="spend"),
+                    TaskEvidence(field="merchant_query", source="current_turn", quote="coffee"),
+                ],
+            )
+        ],
     )
     assert missing_task_field_evidence(assessment) == []
 
@@ -166,29 +203,31 @@ def test_registered_semantic_evidence_repairs_coffee_spending_without_losing_thi
     current_text = "How much did I spend on coffee this month?"
     assessment = TurnInterpretationAssessment(
         resolution="RESOLVED",
-        tasks=[InterpretedTask(
-            intent_id="TRANSACTION_ANALYSIS",
-            requested_outcome="INFORMATION",
-            resolution="READY",
-            slots={
-                # Deliberately wrong semantic values with superficially plausible
-                # quotes: the registered phrase map must correct these values.
-                "period": "last_30_days",
-                "flow": "inflows",
-                "measure": "count",
-                "group_by": "merchant",
-                "analysis_mode": "activity",
-                "transfer_scope": "exclude_category_transfers",
-            },
-            entities={"merchant_query": "coffee"},
-            evidence=[
-                TaskEvidence(field="intent", source="current_turn", quote=current_text),
-                TaskEvidence(field="period", source="current_turn", quote="this month"),
-                TaskEvidence(field="flow", source="current_turn", quote="spend"),
-                TaskEvidence(field="measure", source="current_turn", quote="How much"),
-                TaskEvidence(field="merchant_query", source="current_turn", quote="coffee"),
-            ],
-        )],
+        tasks=[
+            InterpretedTask(
+                intent_id="TRANSACTION_ANALYSIS",
+                requested_outcome="INFORMATION",
+                resolution="READY",
+                slots={
+                    # Deliberately wrong semantic values with superficially plausible
+                    # quotes: the registered phrase map must correct these values.
+                    "period": "last_30_days",
+                    "flow": "inflows",
+                    "measure": "count",
+                    "group_by": "merchant",
+                    "analysis_mode": "activity",
+                    "transfer_scope": "exclude_category_transfers",
+                },
+                entities={"merchant_query": "coffee"},
+                evidence=[
+                    TaskEvidence(field="intent", source="current_turn", quote=current_text),
+                    TaskEvidence(field="period", source="current_turn", quote="this month"),
+                    TaskEvidence(field="flow", source="current_turn", quote="spend"),
+                    TaskEvidence(field="measure", source="current_turn", quote="How much"),
+                    TaskEvidence(field="merchant_query", source="current_turn", quote="coffee"),
+                ],
+            )
+        ],
     )
 
     repaired, info = repair_registered_semantic_evidence(assessment, current_text)
@@ -227,16 +266,18 @@ def test_registered_semantic_evidence_repairs_coffee_spending_without_losing_thi
 def test_registered_semantic_evidence_uses_conditional_salary_default():
     current_text = "What was my recent salary?"
     assessment = TurnInterpretationAssessment(
-        tasks=[InterpretedTask(
-            intent_id="TRANSACTION_ANALYSIS",
-            slots={
-                "period": "last_30_days",
-                "flow": "inflows",
-                "analysis_mode": "recurring_inflows",
-                "measure": "sum",
-            },
-            evidence=[TaskEvidence(field="intent", source="current_turn", quote=current_text)],
-        )],
+        tasks=[
+            InterpretedTask(
+                intent_id="TRANSACTION_ANALYSIS",
+                slots={
+                    "period": "last_30_days",
+                    "flow": "inflows",
+                    "analysis_mode": "recurring_inflows",
+                    "measure": "sum",
+                },
+                evidence=[TaskEvidence(field="intent", source="current_turn", quote=current_text)],
+            )
+        ],
     )
     repaired, _ = repair_registered_semantic_evidence(assessment, current_text)
     task = repaired.tasks[0]
@@ -250,12 +291,14 @@ def test_registered_semantic_evidence_uses_conditional_salary_default():
 def test_unrecognized_explicit_period_is_not_replaced_by_registered_default():
     current_text = "How much did I spend on coffee next month?"
     assessment = TurnInterpretationAssessment(
-        tasks=[InterpretedTask(
-            intent_id="TRANSACTION_ANALYSIS",
-            slots={"period": "this_month", "flow": "outflows"},
-            entities={"merchant_query": "coffee"},
-            evidence=[TaskEvidence(field="intent", source="current_turn", quote=current_text)],
-        )],
+        tasks=[
+            InterpretedTask(
+                intent_id="TRANSACTION_ANALYSIS",
+                slots={"period": "this_month", "flow": "outflows"},
+                entities={"merchant_query": "coffee"},
+                evidence=[TaskEvidence(field="intent", source="current_turn", quote=current_text)],
+            )
+        ],
     )
     repaired, _ = repair_registered_semantic_evidence(assessment, current_text)
     task = repaired.tasks[0]
@@ -297,11 +340,15 @@ def test_recent_salary_request_uses_recurring_inflows_and_conditional_365_day_wi
     candidate = next(item for item in candidates if item["intent_id"] == "TRANSACTION_ANALYSIS")
     assert candidate["match_kind"] == "semantic_phrase"
 
-    assessment = TurnInterpretationAssessment(tasks=[InterpretedTask(
-        intent_id="TRANSACTION_ANALYSIS",
-        slots={"analysis_mode": "activity", "flow": "all", "period": "last_30_days"},
-        evidence=[TaskEvidence(field="intent", source="current_turn", quote=current_text)],
-    )])
+    assessment = TurnInterpretationAssessment(
+        tasks=[
+            InterpretedTask(
+                intent_id="TRANSACTION_ANALYSIS",
+                slots={"analysis_mode": "activity", "flow": "all", "period": "last_30_days"},
+                evidence=[TaskEvidence(field="intent", source="current_turn", quote=current_text)],
+            )
+        ]
+    )
     repaired, _ = repair_registered_semantic_evidence(assessment, current_text)
     task = repaired.tasks[0]
     assert task.slots["analysis_mode"] == "recurring_inflows"

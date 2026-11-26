@@ -43,7 +43,11 @@ def _fastapi_route_strings() -> set[str]:
                 continue
             if not isinstance(decorator.func.value, ast.Name) or decorator.func.value.id != "app":
                 continue
-            if decorator.args and isinstance(decorator.args[0], ast.Constant) and isinstance(decorator.args[0].value, str):
+            if (
+                decorator.args
+                and isinstance(decorator.args[0], ast.Constant)
+                and isinstance(decorator.args[0].value, str)
+            ):
                 routes.add(f"{decorator.func.attr.upper()} {decorator.args[0].value}")
     return routes
 
@@ -56,7 +60,11 @@ def test_mcp_server_tools_match_every_registered_mcp_capability():
 
 def test_frontend_tools_match_every_registered_frontend_capability():
     source = (ROOT / "apps/web/src/main.jsx").read_text(encoding="utf-8")
-    registered = {item["name"] for item in get_registry()["capabilities"].values() if item["kind"] == "frontend"}
+    registered = {
+        item["name"]
+        for item in get_registry()["capabilities"].values()
+        if item["kind"] == "frontend"
+    }
     implemented = set(re.findall(r"useFrontendTool\(\{\s*name:\s*['\"]([^'\"]+)['\"]", source))
     assert implemented == registered
 
@@ -78,7 +86,8 @@ def test_render_tool_status_views_cover_all_agent_invocable_capabilities():
     source = (ROOT / "apps/web/src/main.jsx").read_text(encoding="utf-8")
     registry = get_registry()
     registered = {
-        item["name"] for item in registry["capabilities"].values()
+        item["name"]
+        for item in registry["capabilities"].values()
         if item["authorization"]["agent_invocable"]
     }
     rendered = set(re.findall(r"useRenderTool\(\{\s*name:\s*['\"]([^'\"]+)['\"]", source))
@@ -102,7 +111,8 @@ def test_mcp_tool_python_signatures_match_registry_input_contracts():
     registry = get_registry()
     _, tree = _python_source("services/mcp/main.py")
     functions = {
-        node.name: node for node in tree.body
+        node.name: node
+        for node in tree.body
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
     }
     type_names = {"str": "string", "int": "integer", "float": "number", "bool": "boolean"}
@@ -113,7 +123,14 @@ def test_mcp_tool_python_signatures_match_registry_input_contracts():
         if isinstance(annotation, ast.BinOp) and isinstance(annotation.op, ast.BitOr):
             left, left_nullable = annotation_types(annotation.left)
             right, right_nullable = annotation_types(annotation.right)
-            nullable = left_nullable or right_nullable or isinstance(annotation.left, ast.Constant) and annotation.left.value is None or isinstance(annotation.right, ast.Constant) and annotation.right.value is None
+            nullable = (
+                left_nullable
+                or right_nullable
+                or isinstance(annotation.left, ast.Constant)
+                and annotation.left.value is None
+                or isinstance(annotation.right, ast.Constant)
+                and annotation.right.value is None
+            )
             return left | right, bool(nullable)
         if isinstance(annotation, ast.Constant) and annotation.value is None:
             return set(), True
@@ -162,7 +179,8 @@ def test_every_agent_invocable_capability_has_a_frontend_render_status():
     source = (ROOT / "apps/web/src/main.jsx").read_text(encoding="utf-8")
     registry = get_registry()
     registered = {
-        contract["name"] for contract in registry["capabilities"].values()
+        contract["name"]
+        for contract in registry["capabilities"].values()
         if contract["authorization"]["agent_invocable"]
     }
     rendered = set(re.findall(r"useRenderTool\(\{\s*name:\s*['\"]([^'\"]+)['\"]", source))
@@ -179,7 +197,10 @@ def test_frontend_capability_executor_enforces_registry_preconditions_and_result
     assert "case 'context_collection_contains_argument'" in source
     assert "outcome: 'INVALID_RESPONSE'" in source
     assert app.count("{ context: agentApplicationContext }") == 3
-    assert "navigationActionRuntimeRef.current = { navigate, context: agentApplicationContext, navigationEpoch: manualNavigationEpochRef.current }" in app
+    assert (
+        "navigationActionRuntimeRef.current = { navigate, context: agentApplicationContext, navigationEpoch: manualNavigationEpochRef.current }"
+        in app
+    )
     assert "navigationActionReceiptsRef.current" in app
     assert "executeNavigationOnce(navigationActionReceiptsRef.current, action_id" in app
     assert "  }, [])" in app
@@ -188,6 +209,11 @@ def test_frontend_capability_executor_enforces_registry_preconditions_and_result
 def test_registry_is_the_source_of_truth_for_navigation_prompt_and_browser_allowlist():
     agent = (ROOT / "services/agent_runtime/agent.py").read_text(encoding="utf-8")
     frontend = (ROOT / "apps/web/src/contracts.js").read_text(encoding="utf-8")
-    assert 'get_registry().get("application_policy", {}).get("navigation", {}).get("pages", [])' in agent
+    assert (
+        'get_registry().get("application_policy", {}).get("navigation", {}).get("pages", [])'
+        in agent
+    )
     assert "CONTRACT_REGISTRY.application_policy?.navigation?.aliases" in frontend
-    assert "const WORKSPACE_ALIASES" not in (ROOT / "apps/web/src/main.jsx").read_text(encoding="utf-8")
+    assert "const WORKSPACE_ALIASES" not in (ROOT / "apps/web/src/main.jsx").read_text(
+        encoding="utf-8"
+    )

@@ -1,4 +1,5 @@
 """Verified customer-facing acknowledgements for browser action receipts."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -26,7 +27,10 @@ def transfer_draft_receipt_message(
     if not messages:
         return None
     result_message = messages[-1]
-    if message_type(result_message) != "tool" or message_value(result_message, "name", "") != "prepare_transfer_draft":
+    if (
+        message_type(result_message) != "tool"
+        or message_value(result_message, "name", "") != "prepare_transfer_draft"
+    ):
         return None
 
     raw = str(message_value(result_message, "content", ""))
@@ -72,23 +76,36 @@ def transfer_draft_receipt_message(
     data = envelope.get("data") if isinstance(envelope.get("data"), dict) else {}
     if outcome != "SUCCESS" or data.get("status") != "draft_opened":
         error = envelope.get("error") if isinstance(envelope.get("error"), dict) else {}
-        reason = str(error.get("message") or data.get("reason") or "the application did not confirm the draft")
+        reason = str(
+            error.get("message")
+            or data.get("reason")
+            or "the application did not confirm the draft"
+        )
         return (
             f"I couldn't open the editable transfer draft: {reason}. No payment was submitted.",
-            {"capability_id": "frontend.transfer.prepare_draft", "status": str(data.get("status") or outcome or "REJECTED")},
+            {
+                "capability_id": "frontend.transfer.prepare_draft",
+                "status": str(data.get("status") or outcome or "REJECTED"),
+            },
         )
 
     workflow_id = str(args.get("workflow_id", ""))
     action_id = str(args.get("action_id", ""))
-    if (data.get("workflow_id") != workflow_id or data.get("action_id") != action_id):
+    if data.get("workflow_id") != workflow_id or data.get("action_id") != action_id:
         return (
             "I couldn't match the browser confirmation to this transfer draft. Please check the draft view. No payment was submitted.",
             {"capability_id": "frontend.transfer.prepare_draft", "status": "MISMATCHED_RECEIPT"},
         )
 
     source_id = str(args.get("from_account_id", ""))
-    source = next((item for item in (source_accounts or [])
-                   if isinstance(item, dict) and str(item.get("account_id", "")) == source_id), None)
+    source = next(
+        (
+            item
+            for item in (source_accounts or [])
+            if isinstance(item, dict) and str(item.get("account_id", "")) == source_id
+        ),
+        None,
+    )
     source_name = str(source.get("account_name", "")) if source else ""
     amount = str(args.get("amount", "")).strip()
     currency = str(args.get("currency", "")).upper()

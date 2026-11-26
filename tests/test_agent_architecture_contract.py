@@ -3,6 +3,7 @@
 These supplement behavior tests: the Agent Runtime integration dependencies
 are intentionally optional in the lightweight source-audit environment.
 """
+
 from __future__ import annotations
 
 import ast
@@ -38,7 +39,9 @@ def test_model_boundaries_expose_only_assessment_or_customer_response_contracts(
     bound = {_list_name(item) for item in _bind_tools_arguments()}
     assert bound == {"customer_response_tool"}
 
-    interpretation_source = (ROOT / "services/agent_runtime/task_interpretation.py").read_text(encoding="utf-8")
+    interpretation_source = (ROOT / "services/agent_runtime/task_interpretation.py").read_text(
+        encoding="utf-8"
+    )
     assert "model.bind_tools([assessment_tool], tool_choice=choice)" in interpretation_source
     assert "method(AssessmentToolArguments)" in interpretation_source
     assert "with_structured_output" in interpretation_source
@@ -57,22 +60,29 @@ def test_customer_response_composition_is_buffered_until_contract_validation():
 def test_runtime_task_plans_keep_one_deadline_across_validation_rebuilds():
     tree = ast.parse(AGENT_SOURCE.read_text(encoding="utf-8"))
     calls = [
-        node for node in ast.walk(tree)
+        node
+        for node in ast.walk(tree)
         if isinstance(node, ast.Call)
         and isinstance(node.func, ast.Name)
         and node.func.id == "_task_plan_records"
     ]
     assert len(calls) >= 3
     assert all(
-        any(keyword.arg == "model_deadline_epoch" for keyword in call.keywords)
-        for call in calls
+        any(keyword.arg == "model_deadline_epoch" for keyword in call.keywords) for call in calls
     )
 
 
 def test_all_private_model_phases_use_callback_isolation_and_agui_filters_internal_messages():
     source = AGENT_SOURCE.read_text(encoding="utf-8")
     assert source.count("invoke_internal_model(") >= 4
-    assert ".ainvoke(" not in source[source.index("async def compose_grounded_response"):source.index("async def execute_tools")]
+    assert (
+        ".ainvoke("
+        not in source[
+            source.index("async def compose_grounded_response") : source.index(
+                "async def execute_tools"
+            )
+        ]
+    )
 
     agui_source = (ROOT / "services/agent_runtime/agui.py").read_text(encoding="utf-8")
     assert "synthesize_terminal_assistant_message(" in agui_source
@@ -89,7 +99,9 @@ def test_internal_read_boundary_strips_interpretation_transport_metadata():
     end = source.index("\ndef _build_mcp_agent_tool", start)
     body = source[start:end]
     assert "strip_assessment_tool_arguments(raw_arguments)" in body
-    assert body.index("strip_assessment_tool_arguments(raw_arguments)") < body.index("validate_capability_input(capability_id, payload)")
+    assert body.index("strip_assessment_tool_arguments(raw_arguments)") < body.index(
+        "validate_capability_input(capability_id, payload)"
+    )
 
 
 def test_final_composed_message_retains_the_task_plan_for_follow_up_continuity():

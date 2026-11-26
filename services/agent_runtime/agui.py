@@ -13,9 +13,15 @@ import json
 from typing import Any
 
 from ag_ui.core import (
-    EventType, RunErrorEvent, TextMessageContentEvent,
-    TextMessageEndEvent, TextMessageStartEvent,
-    ToolCallArgsEvent, ToolCallEndEvent, ToolCallResultEvent, ToolCallStartEvent,
+    EventType,
+    RunErrorEvent,
+    TextMessageContentEvent,
+    TextMessageEndEvent,
+    TextMessageStartEvent,
+    ToolCallArgsEvent,
+    ToolCallEndEvent,
+    ToolCallResultEvent,
+    ToolCallStartEvent,
 )
 from ag_ui.core.types import RunAgentInput
 from ag_ui.encoder import EventEncoder
@@ -27,7 +33,9 @@ from langgraph.graph import END, START, StateGraph
 from copilotkit import CopilotKitState
 
 
-from services.agent_runtime.action_response_guard import has_successful_frontend_ack_after_latest_user
+from services.agent_runtime.action_response_guard import (
+    has_successful_frontend_ack_after_latest_user,
+)
 from services.agent_runtime.agent import (
     _call_read_capability,
     _connector_failure_message,
@@ -112,7 +120,10 @@ def _snapshot_recovery_tool_result_names() -> set[str]:
 
 
 def _make_snapshot_tool_call_events(
-    tool_call_id: str, tool_call_name: str, parent_message_id: str, arguments_json: str,
+    tool_call_id: str,
+    tool_call_name: str,
+    parent_message_id: str,
+    arguments_json: str,
 ):
     """Encode a validated snapshot-only UI call as its normal AG-UI lifecycle."""
     return [
@@ -136,6 +147,7 @@ def _make_snapshot_tool_call_events(
 
 def build_demo_agui_graph(checkpointer=None):
     """Build the deterministic demo graph exposed through the AG-UI adapter."""
+
     async def _respond(state: ORAIState):
         # The model-backed graph has this one-shot guard in both its router
         # and call_model path. Mirror it in demo mode: a browser draft receipt
@@ -153,6 +165,7 @@ def build_demo_agui_graph(checkpointer=None):
         # than issuing the same frontend tool call again.
         if last_message is not None and message_type(last_message) == "tool":
             import json
+
             raw_result = str(message_value(last_message, "content", ""))
             try:
                 result = json.loads(raw_result)
@@ -165,15 +178,28 @@ def build_demo_agui_graph(checkpointer=None):
                     raise ValueError("Unregistered frontend tool result")
                 envelope = parse_result_envelope(registered[0], raw_result)
             except Exception:
-                logger.warning("frontend_result_contract_rejected trace_id=%s tool=%s", current_trace_id(), tool_name)
-                return {"messages": [AIMessage(content="I couldn't verify that application action completed. Please check the current screen and try again if needed.")]}
+                logger.warning(
+                    "frontend_result_contract_rejected trace_id=%s tool=%s",
+                    current_trace_id(),
+                    tool_name,
+                )
+                return {
+                    "messages": [
+                        AIMessage(
+                            content="I couldn't verify that application action completed. Please check the current screen and try again if needed."
+                        )
+                    ]
+                }
             outcome = envelope.get("outcome")
             result = envelope.get("data") if outcome == "SUCCESS" else {}
             status = result.get("status") if isinstance(result, dict) else None
             if outcome in {"UNAVAILABLE", "INVALID_RESPONSE", "INVALID_INPUT"}:
                 reply = "I couldn't complete that application action just now. Please try again."
             elif outcome == "REJECTED":
-                reply = str((envelope.get("error") or {}).get("message") or "The application rejected that action.")
+                reply = str(
+                    (envelope.get("error") or {}).get("message")
+                    or "The application rejected that action."
+                )
             elif status == "selected":
                 reply = "Done — I opened Activity with that account selected. The Overview's Recent Activity remains global."
             elif status == "opened":
@@ -196,7 +222,9 @@ def build_demo_agui_graph(checkpointer=None):
             return {"messages": [AIMessage(content=reply)]}
         latest = next((m for m in reversed(messages) if message_type(m) == "human"), None)
         if latest is None:
-            return {"messages": [AIMessage(content="What would you like to explore in your accounts?")]}
+            return {
+                "messages": [AIMessage(content="What would you like to explore in your accounts?")]
+            }
         latest_text = str(message_value(latest, "content", ""))
         text = latest_text.lower()
         actions = (state.get("copilotkit") or {}).get("actions") or []
@@ -225,7 +253,9 @@ def build_demo_agui_graph(checkpointer=None):
                     break
                 raw_result = await _call_read_capability(tool_name, call.get("args") or {})
                 tool_result = ToolMessage(
-                    name=tool_name, tool_call_id=call_id, content=raw_result,
+                    name=tool_name,
+                    tool_call_id=call_id,
+                    content=raw_result,
                 )
                 transfer_state = {
                     **transfer_state,
@@ -234,7 +264,14 @@ def build_demo_agui_graph(checkpointer=None):
                 transfer_step = _handle_transfer_workflow(transfer_state, context)
                 if transfer_step is None:
                     break
-            return {"messages": [transfer_step or AIMessage(content="I couldn't safely continue the transfer preparation. No draft was opened.")]}
+            return {
+                "messages": [
+                    transfer_step
+                    or AIMessage(
+                        content="I couldn't safely continue the transfer preparation. No draft was opened."
+                    )
+                ]
+            }
 
         # Confirmation and destination replies must resume in demo mode just
         # as they do in the model-backed graph. In particular, "ok" must
@@ -260,24 +297,78 @@ def build_demo_agui_graph(checkpointer=None):
         navigation_step = _workspace_navigation_step(latest_text, state)
         if navigation_step is not None:
             return {"messages": [navigation_step]}
-        if "clear_account_selection" in action_names and any(phrase in text for phrase in ("clear account filter", "all account activity", "activity for all accounts", "show all transactions")):
-            return {"messages": [AIMessage(content="", tool_calls=[{"name": "clear_account_selection", "args": {}, "id": f"oraiflow-clear-filter-{uuid.uuid4().hex}", "type": "tool_call"}])]}
-        selection_intent = any(phrase in text for phrase in ("select ", "switch to ", "open activity for ", "show activity for ", "show transactions for ", "activity on "))
+        if "clear_account_selection" in action_names and any(
+            phrase in text
+            for phrase in (
+                "clear account filter",
+                "all account activity",
+                "activity for all accounts",
+                "show all transactions",
+            )
+        ):
+            return {
+                "messages": [
+                    AIMessage(
+                        content="",
+                        tool_calls=[
+                            {
+                                "name": "clear_account_selection",
+                                "args": {},
+                                "id": f"oraiflow-clear-filter-{uuid.uuid4().hex}",
+                                "type": "tool_call",
+                            }
+                        ],
+                    )
+                ]
+            }
+        selection_intent = any(
+            phrase in text
+            for phrase in (
+                "select ",
+                "switch to ",
+                "open activity for ",
+                "show activity for ",
+                "show transactions for ",
+                "activity on ",
+            )
+        )
         if "select_account" in action_names and selection_intent:
             import json
+
             account_result = parse_result_envelope(
                 "banking.accounts.list", await _call_read_capability("list_customer_accounts")
             )
-            accounts = account_result.get("data", []) if account_result.get("outcome") in {"SUCCESS", "EMPTY"} else []
+            accounts = (
+                account_result.get("data", [])
+                if account_result.get("outcome") in {"SUCCESS", "EMPTY"}
+                else []
+            )
             match = next((a for a in accounts if a.get("account_name", "").lower() in text), None)
             if match:
-                return {"messages": [AIMessage(content="", tool_calls=[{"name": "select_account", "args": {"account_id": match["account_id"]}, "id": f"oraiflow-select-account-{uuid.uuid4().hex}", "type": "tool_call"}])]}
+                return {
+                    "messages": [
+                        AIMessage(
+                            content="",
+                            tool_calls=[
+                                {
+                                    "name": "select_account",
+                                    "args": {"account_id": match["account_id"]},
+                                    "id": f"oraiflow-select-account-{uuid.uuid4().hex}",
+                                    "type": "tool_call",
+                                }
+                            ],
+                        )
+                    ]
+                }
         context = _app_context(state)
         selected_name = context.get("selected_account_name") if isinstance(context, dict) else None
         query = latest_text
         if selected_name and selected_name != "All accounts":
             query = f"{query} (current selected account: {selected_name})"
-        explicit_navigation = any(phrase in text for phrase in ("open ", "go to ", "navigate to ", "take me to ", "switch workspace to "))
+        explicit_navigation = any(
+            phrase in text
+            for phrase in ("open ", "go to ", "navigate to ", "take me to ", "switch workspace to ")
+        )
         # Resolve common human shorthand before any model-generated route can
         # reach the browser. The frontend independently validates the alias.
 
@@ -295,7 +386,8 @@ def build_demo_agui_graph(checkpointer=None):
                 if mcp_capability:
                     raw_result = await _call_read_capability(call["name"], call.get("args") or {})
                     tool_result = ToolMessage(
-                        name=call["name"], tool_call_id=call.get("id", f"demo-{uuid.uuid4().hex}"),
+                        name=call["name"],
+                        tool_call_id=call.get("id", f"demo-{uuid.uuid4().hex}"),
                         content=raw_result,
                     )
                     canonical_state = {
@@ -307,19 +399,53 @@ def build_demo_agui_graph(checkpointer=None):
 
         if explicit_navigation and "navigate_workspace" in action_names:
             destinations = {
-                "overview": "Overview", "dashboard": "Overview", "home": "Overview",
-                "accounts": "Accounts", "payments": "Payments", "cards": "Cards",
-                "contacts": "Contacts", "contact": "Contacts", "beneficiaries": "Contacts", "payees": "Contacts",
-                "activity": "Activity", "transactions": "Activity",
-                "ai assistant": "AI assistant", "assistant": "AI assistant",
-                "controls": "Controls & audit", "audit": "Controls & audit", "audit trail": "Controls & audit", "governance": "Controls & audit", "security": "Controls & audit", "controls audit": "Controls & audit",
+                "overview": "Overview",
+                "dashboard": "Overview",
+                "home": "Overview",
+                "accounts": "Accounts",
+                "payments": "Payments",
+                "cards": "Cards",
+                "contacts": "Contacts",
+                "contact": "Contacts",
+                "beneficiaries": "Contacts",
+                "payees": "Contacts",
+                "activity": "Activity",
+                "transactions": "Activity",
+                "ai assistant": "AI assistant",
+                "assistant": "AI assistant",
+                "controls": "Controls & audit",
+                "audit": "Controls & audit",
+                "audit trail": "Controls & audit",
+                "governance": "Controls & audit",
+                "security": "Controls & audit",
+                "controls audit": "Controls & audit",
             }
-            destination = next((label for term, label in destinations.items() if term in text), None)
+            destination = next(
+                (label for term, label in destinations.items() if term in text), None
+            )
             if destination:
                 action_id = f"nav-{uuid.uuid4().hex}"
-                return {"messages": [AIMessage(content="", tool_calls=[{"name": "navigate_workspace", "args": {"workspace": destination, "action_id": action_id}, "id": action_id, "type": "tool_call"}])]}
+                return {
+                    "messages": [
+                        AIMessage(
+                            content="",
+                            tool_calls=[
+                                {
+                                    "name": "navigate_workspace",
+                                    "args": {"workspace": destination, "action_id": action_id},
+                                    "id": action_id,
+                                    "type": "tool_call",
+                                }
+                            ],
+                        )
+                    ]
+                }
 
-        if selected_name and selected_name != "All accounts" and any(term in query.lower() for term in ("balance", "how much", "money")):
+        if (
+            selected_name
+            and selected_name != "All accounts"
+            and any(term in query.lower() for term in ("balance", "how much", "money"))
+        ):
             account_id = context.get("selected_account_id")
             if account_id:
                 balance_result = parse_result_envelope(
@@ -343,7 +469,13 @@ def build_demo_agui_graph(checkpointer=None):
             # Never expose MCP/session details or internal orchestration text to
             # the customer. The exception is logged without arguments/data.
             logger.exception("demo_agent_request_failed trace_id=%s", current_trace_id())
-            result = {"messages": [AIMessage(content="I couldn't retrieve the requested banking information just now. No financial action was taken. Please try again.")]}
+            result = {
+                "messages": [
+                    AIMessage(
+                        content="I couldn't retrieve the requested banking information just now. No financial action was taken. Please try again."
+                    )
+                ]
+            }
 
         # Demo and model-backed providers share the exact same request and
         # response receipt contract. This wrapper runs once at the AG-UI graph
@@ -357,23 +489,31 @@ def build_demo_agui_graph(checkpointer=None):
                 state, latest_human_text(state.get("messages", []))
             )
             contracted = [
-                _attach_agent_turn_contract(message, turn_context, state.get("messages", []))
-                if isinstance(message, AIMessage) else message
+                (
+                    _attach_agent_turn_contract(message, turn_context, state.get("messages", []))
+                    if isinstance(message, AIMessage)
+                    else message
+                )
                 for message in messages
             ]
             result["messages"] = contracted
             logger.info(
                 "agent_turn_contract_prepared trace_id=%s turn_id=%s provider=demo workspace=%s mcp=%d frontend=%d presentations=%d candidates=%d",
-                current_trace_id(), turn_context.turn_id, turn_context.workspace_id or "unknown",
+                current_trace_id(),
+                turn_context.turn_id,
+                turn_context.workspace_id or "unknown",
                 len(turn_context.available_mcp_capability_ids),
                 len(turn_context.available_frontend_capability_ids),
-                len(turn_context.available_presentation_ids), len(turn_context.intent_candidates),
+                len(turn_context.available_presentation_ids),
+                len(turn_context.intent_candidates),
             )
         except Exception:
             # Contract construction is fail-closed for model-visible tools but
             # must never lose the already-created customer response. Emit a
             # diagnostic and let the AG-UI stream retain its original message.
-            logger.exception("demo_agent_turn_contract_attachment_failed trace_id=%s", current_trace_id())
+            logger.exception(
+                "demo_agent_turn_contract_attachment_failed trace_id=%s", current_trace_id()
+            )
         return result
 
     graph = StateGraph(ORAIState)
@@ -391,13 +531,17 @@ async def start_agui_runtime(app):
 
     connection_string = os.getenv("AGENT_CHECKPOINT_DATABASE_URL", "").strip()
     if not connection_string:
-        raise RuntimeError("AGENT_CHECKPOINT_DATABASE_URL must point to the restricted oraiflow_agent schema")
+        raise RuntimeError(
+            "AGENT_CHECKPOINT_DATABASE_URL must point to the restricted oraiflow_agent schema"
+        )
     checkpointer_context = AsyncPostgresSaver.from_conn_string(connection_string)
     checkpointer = await checkpointer_context.__aenter__()
     try:
         await checkpointer.setup()
         provider = os.getenv("LLM_PROVIDER", "demo").lower()
-        graph = build_demo_agui_graph(checkpointer) if provider == "demo" else build_graph(checkpointer)
+        graph = (
+            build_demo_agui_graph(checkpointer) if provider == "demo" else build_graph(checkpointer)
+        )
         app.state.agui_agent = LangGraphAGUIAgent(
             name="oraiflow_agent",
             description="ORAIflow read-only banking assistant. It can explain accounts and activity but cannot approve or execute financial actions.",
@@ -455,7 +599,9 @@ def register_agui_routes(app):
                 initial_messages = list(getattr(input_data, "messages", []) or [])
                 initial_message_ids = set()
                 for item in initial_messages:
-                    message_id = item.get("id") if isinstance(item, dict) else getattr(item, "id", None)
+                    message_id = (
+                        item.get("id") if isinstance(item, dict) else getattr(item, "id", None)
+                    )
                     if message_id:
                         initial_message_ids.add(str(message_id))
 
@@ -487,31 +633,36 @@ def register_agui_routes(app):
                 def log_snapshot_fallback(message_id: str):
                     logger.warning(
                         "agui_snapshot_message_fallback trace_id=%s message_id=%s",
-                        trace_id, message_id,
+                        trace_id,
+                        message_id,
                     )
 
                 def log_tool_call_fallback(tool_name: str):
                     logger.warning(
                         "agui_snapshot_tool_call_fallback trace_id=%s tool_name=%s",
-                        trace_id, tool_name,
+                        trace_id,
+                        tool_name,
                     )
 
                 def log_tool_result_fallback(tool_name: str):
                     logger.warning(
                         "agui_snapshot_tool_result_fallback trace_id=%s tool_name=%s",
-                        trace_id, tool_name,
+                        trace_id,
+                        tool_name,
                     )
 
                 def log_history_reconciled(count: int):
                     logger.info(
                         "agui_snapshot_history_reconciled trace_id=%s matched_message_count=%d",
-                        trace_id, count,
+                        trace_id,
+                        count,
                     )
 
                 def log_snapshot_suppressed(count: int):
                     logger.info(
                         "agui_transcript_snapshots_suppressed trace_id=%s snapshot_count=%d",
-                        trace_id, count,
+                        trace_id,
+                        count,
                     )
 
                 def log_missing_message():
@@ -548,7 +699,8 @@ def register_agui_routes(app):
                     delay_seconds=scripted_chunk_delay_ms / 1000.0,
                 )
                 async for event in iter_with_keepalives(
-                    customer_events, interval_seconds=keepalive_seconds,
+                    customer_events,
+                    interval_seconds=keepalive_seconds,
                 ):
                     if event is None:
                         keepalive_count += 1
@@ -583,11 +735,13 @@ def register_agui_routes(app):
                 # A stream-level fault must be visible to the AG-UI client.
                 # Do not expose provider, MCP, database or exception details.
                 try:
-                    yield encoder.encode(RunErrorEvent(
-                        type=EventType.RUN_ERROR,
-                        message="ORAIflow couldn't complete this response. Please try again. No financial action was taken.",
-                        code="AGENT_STREAM_ERROR",
-                    ))
+                    yield encoder.encode(
+                        RunErrorEvent(
+                            type=EventType.RUN_ERROR,
+                            message="ORAIflow couldn't complete this response. Please try again. No financial action was taken.",
+                            code="AGENT_STREAM_ERROR",
+                        )
+                    )
                 except Exception:
                     logger.exception("agui_run_error_event_encode_failed trace_id=%s", trace_id)
             finally:
@@ -608,5 +762,9 @@ def register_agui_routes(app):
         return StreamingResponse(
             events(),
             media_type=encoder.get_content_type(),
-            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no", "X-ORAIflow-Trace-ID": trace_id},
+            headers={
+                "Cache-Control": "no-cache",
+                "X-Accel-Buffering": "no",
+                "X-ORAIflow-Trace-ID": trace_id,
+            },
         )

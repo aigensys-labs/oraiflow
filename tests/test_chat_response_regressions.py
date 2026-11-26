@@ -2,7 +2,10 @@ from types import SimpleNamespace
 
 import pytest
 
-from services.agent_runtime.academy import academy_direct_guidance_for_request, academy_topic_matches
+from services.agent_runtime.academy import (
+    academy_direct_guidance_for_request,
+    academy_topic_matches,
+)
 from services.agent_runtime.intent_contracts import discover_intent_candidates
 from services.agent_runtime.interpretation import validate_interpretation_assessment
 from services.agent_runtime.task_interpretation import (
@@ -72,14 +75,14 @@ def test_saved_contact_lookup_is_a_distinct_llm_assessed_read_only_intent():
     assert "prevents a coherent follow-up" in prompt
 
 
-
 def test_named_saved_contact_is_prioritized_in_bounded_interpreter_context():
-    contacts = [
-        {"full_name": f"Person {index}", "status": "ACTIVE"}
-        for index in range(100)
-    ] + [{"full_name": "John Smith", "status": "ACTIVE"}]
+    contacts = [{"full_name": f"Person {index}", "status": "ACTIVE"} for index in range(100)] + [
+        {"full_name": "John Smith", "status": "ACTIVE"}
+    ]
     selected = rank_saved_contacts_for_context(
-        contacts, "Find John in my saved contacts.", limit=20,
+        contacts,
+        "Find John in my saved contacts.",
+        limit=20,
     )
     assert selected[0] == {"name": "John Smith", "status": "ACTIVE"}
     prompt = build_assessment_prompt(
@@ -91,12 +94,10 @@ def test_named_saved_contact_is_prioritized_in_bounded_interpreter_context():
 
 
 def test_unrelated_financial_analysis_does_not_receive_arbitrary_saved_contacts():
-    contacts = [
-        {"full_name": f"Person {index}", "status": "ACTIVE"}
-        for index in range(100)
-    ]
+    contacts = [{"full_name": f"Person {index}", "status": "ACTIVE"} for index in range(100)]
     selected = rank_saved_contacts_for_context(
-        contacts, "How much did I spend on coffee?",
+        contacts,
+        "How much did I spend on coffee?",
     )
     assert selected == []
 
@@ -142,7 +143,11 @@ def test_saved_contact_lookup_assessment_does_not_require_transfer_amount_or_cur
             "slots": {},
             "entities": {"contact_name": "John"},
             "evidence": [
-                {"field": "intent", "source": "current_turn", "quote": "Find John in my saved contacts."},
+                {
+                    "field": "intent",
+                    "source": "current_turn",
+                    "quote": "Find John in my saved contacts.",
+                },
                 {"field": "contact_name", "source": "current_turn", "quote": "John"},
             ],
         },
@@ -164,7 +169,6 @@ def test_saved_contact_lookup_intent_is_registered_against_existing_read_only_ca
     assert "TRANSFER_PREPARATION" not in intent["description"]
 
 
-
 def test_transfer_named_account_with_generic_account_suffix_is_normalized_from_context():
     utterance = "Lucas from Everyday account"
     prior = "Help me prepare a transfer of 50 EUR."
@@ -183,7 +187,9 @@ def test_transfer_named_account_with_generic_account_suffix_is_normalized_from_c
             TaskEvidence(field="amount", source="conversation", quote="50 EUR"),
             TaskEvidence(field="currency", source="conversation", quote="EUR"),
             TaskEvidence(field="beneficiary", source="current_turn", quote="Lucas"),
-            TaskEvidence(field="source_account_preference", source="current_turn", quote="Everyday account"),
+            TaskEvidence(
+                field="source_account_preference", source="current_turn", quote="Everyday account"
+            ),
         ],
         intent_confidence=0.98,
         slot_confidence=0.97,
@@ -193,7 +199,9 @@ def test_transfer_named_account_with_generic_account_suffix_is_normalized_from_c
         task,
         sources={"current_turn": utterance, "conversation": prior + "\n" + utterance},
         messages=[_human(prior), _human(utterance)],
-        context={"accounts": [{"account_id": "acct-ui-1", "account_name": "Everyday", "currency": "EUR"}]},
+        context={
+            "accounts": [{"account_id": "acct-ui-1", "account_name": "Everyday", "currency": "EUR"}]
+        },
     )
     assert planned["status"] == "PLANNED"
     assert planned["assessment"]["slots"]["source_account"] == "Everyday"
@@ -219,7 +227,6 @@ def test_latest_transaction_explicit_phrase_has_safe_defaulted_contract_recovery
     assert planned["semantic_values"]["transaction_selector"] == "latest"
 
 
-
 def test_planner_preserves_partial_transfer_as_a_specific_missing_beneficiary_task():
     utterance = "Help me prepare a transfer of 50 EUR."
     task = InterpretedTask(
@@ -242,11 +249,16 @@ def test_planner_preserves_partial_transfer_as_a_specific_missing_beneficiary_ta
         task,
         sources={"current_turn": utterance},
         messages=[_human(utterance)],
-        context={"accounts": [{"account_id": "acct-1", "account_name": "Everyday", "currency": "EUR"}]},
+        context={
+            "accounts": [{"account_id": "acct-1", "account_name": "Everyday", "currency": "EUR"}]
+        },
     )
     assert planned["status"] == "CLARIFICATION_REQUIRED"
     assert "beneficiary" in planned["missing_fields"]
-    assert "50" not in planned["clarification_question"] or "amount" not in planned["clarification_question"].casefold()
+    assert (
+        "50" not in planned["clarification_question"]
+        or "amount" not in planned["clarification_question"].casefold()
+    )
 
 
 def test_transfer_named_account_preference_is_normalized_to_source_account_from_context():
@@ -267,7 +279,9 @@ def test_transfer_named_account_preference_is_normalized_to_source_account_from_
             TaskEvidence(field="amount", source="conversation", quote="50 EUR"),
             TaskEvidence(field="currency", source="conversation", quote="EUR"),
             TaskEvidence(field="beneficiary", source="current_turn", quote="Lucas"),
-            TaskEvidence(field="source_account_preference", source="current_turn", quote="everyday account"),
+            TaskEvidence(
+                field="source_account_preference", source="current_turn", quote="everyday account"
+            ),
         ],
         intent_confidence=0.98,
         slot_confidence=0.97,
@@ -280,7 +294,9 @@ def test_transfer_named_account_preference_is_normalized_to_source_account_from_
             "conversation": prior + "\n" + utterance,
         },
         messages=[_human(prior), _human(utterance)],
-        context={"accounts": [{"account_id": "acct-ui-1", "account_name": "Everyday", "currency": "EUR"}]},
+        context={
+            "accounts": [{"account_id": "acct-ui-1", "account_name": "Everyday", "currency": "EUR"}]
+        },
     )
     assert planned["status"] == "PLANNED"
     assert planned["assessment"]["slots"]["source_account"] == "Everyday"

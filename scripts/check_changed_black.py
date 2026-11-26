@@ -7,7 +7,6 @@ import os
 import subprocess
 from pathlib import Path
 
-
 ZERO_SHA = "0" * 40
 
 

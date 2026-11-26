@@ -23,7 +23,6 @@ from services.agent_runtime.task_planner import plan_interpreted_task
 from services.agent_runtime.workspace_knowledge import workspace_help_for_request
 from shared.contracts.registry import get_registry
 
-
 FINANCIAL_HEALTH_QUESTION = (
     "Explain my Financial Health badge. What does my recorded loan-to-equity ratio mean, "
     "and what could improve or worsen it?"
@@ -74,7 +73,9 @@ def test_academy_prompt_catalogue_does_not_match_transfer_stopwords():
 
 
 def test_academy_prompt_catalogue_includes_both_sides_of_credit_score_comparison():
-    topic_ids = {item["topic_id"] for item in academy_prompt_catalogue(query=CREDIT_COMPARISON_QUESTION)}
+    topic_ids = {
+        item["topic_id"] for item in academy_prompt_catalogue(query=CREDIT_COMPARISON_QUESTION)
+    }
     assert "CREDIT_SCORE_BASICS" in topic_ids
     assert "FINANCIAL_HEALTH_BADGE" in topic_ids
 
@@ -82,7 +83,9 @@ def test_academy_prompt_catalogue_includes_both_sides_of_credit_score_comparison
 def test_workspace_prompt_catalogue_does_not_treat_credit_or_loan_to_equity_as_workspace_request():
     assert workspace_prompt_catalogue(query=CREDIT_COMPARISON_QUESTION) == []
     assert workspace_prompt_catalogue(query=FINANCIAL_HEALTH_QUESTION) == []
-    assert [item["workspace_id"] for item in workspace_prompt_catalogue(query="what is Academy?")] == ["Academy"]
+    assert [
+        item["workspace_id"] for item in workspace_prompt_catalogue(query="what is Academy?")
+    ] == ["Academy"]
 
 
 def test_workspace_questions_resolve_from_registered_catalogue():
@@ -94,9 +97,15 @@ def test_workspace_questions_resolve_from_registered_catalogue():
 
 
 def test_personal_snapshot_requires_topic_local_ownership_reference():
-    assert academy_personal_snapshot_intent(FINANCIAL_HEALTH_QUESTION) == "FINANCIAL_HEALTH_EXPLANATION"
+    assert (
+        academy_personal_snapshot_intent(FINANCIAL_HEALTH_QUESTION)
+        == "FINANCIAL_HEALTH_EXPLANATION"
+    )
     assert academy_personal_snapshot_intent(BORROWING_QUESTION) == "FINANCIAL_HEALTH_EXPLANATION"
-    assert academy_personal_snapshot_intent(CREDIT_COMPARISON_QUESTION) == "FINANCIAL_HEALTH_EXPLANATION"
+    assert (
+        academy_personal_snapshot_intent(CREDIT_COMPARISON_QUESTION)
+        == "FINANCIAL_HEALTH_EXPLANATION"
+    )
     assert academy_personal_snapshot_intent(CASH_FLOW_QUESTION) is None
 
 
@@ -109,16 +118,18 @@ def test_cash_flow_question_uses_maintained_education_without_false_financial_he
 
 def test_financial_health_renderer_preserves_general_credit_education_and_personal_snapshot():
     data = {
-        "positions": [{
-            "currency": "EUR",
-            "recorded_equity_minor": 2351830,
-            "recorded_deposit_assets_minor": 2351830,
-            "total_recorded_liabilities_minor": 500000,
-            "loan_liabilities_minor": 500000,
-            "loan_to_equity_bps": 2126,
-            "debt_to_assets_bps": 2126,
-            "status": "LOW_LEVERAGE",
-        }]
+        "positions": [
+            {
+                "currency": "EUR",
+                "recorded_equity_minor": 2351830,
+                "recorded_deposit_assets_minor": 2351830,
+                "total_recorded_liabilities_minor": 500000,
+                "loan_liabilities_minor": 500000,
+                "loan_to_equity_bps": 2126,
+                "debt_to_assets_bps": 2126,
+                "status": "LOW_LEVERAGE",
+            }
+        ]
     }
     answer = render_financial_health_explanation(data, CREDIT_COMPARISON_QUESTION)
     assert "Credit scores and credit reports" in answer
@@ -150,17 +161,21 @@ def test_direct_assessment_payload_is_strict_and_legacy_nested_payload_is_readab
     payload = {
         "schema_version": "1.0.0",
         "resolution": "RESOLVED",
-        "tasks": [{
-            "intent_id": "TRANSFER_PREPARATION",
-            "requested_outcome": "ACTION",
-            "resolution": "READY",
-            "slots": {"amount": 50, "currency": "EUR"},
-            "entities": {"beneficiary": "John"},
-            "evidence": [{"field": "intent", "source": "current_turn", "quote": "send 50 EUR to John"}],
-            "intent_confidence": 0.99,
-            "slot_confidence": 0.98,
-            "entity_confidence": 0.98,
-        }],
+        "tasks": [
+            {
+                "intent_id": "TRANSFER_PREPARATION",
+                "requested_outcome": "ACTION",
+                "resolution": "READY",
+                "slots": {"amount": 50, "currency": "EUR"},
+                "entities": {"beneficiary": "John"},
+                "evidence": [
+                    {"field": "intent", "source": "current_turn", "quote": "send 50 EUR to John"}
+                ],
+                "intent_confidence": 0.99,
+                "slot_confidence": 0.98,
+                "entity_confidence": 0.98,
+            }
+        ],
     }
     parsed, info = parse_assessment_payload(payload)
     assert parsed is not None
@@ -251,7 +266,9 @@ def test_existing_transfer_parser_can_retain_explicit_amount_and_recipient_witho
     from shared.contact_resolution import extract_contact_transfer_request
 
     parsed = extract_contact_transfer_request(
-        "send 50 to John", {"accounts": []}, allow_currency_missing=True,
+        "send 50 to John",
+        {"accounts": []},
+        allow_currency_missing=True,
     )
     assert parsed is not None
     assert parsed["amount"] == "50"
@@ -275,7 +292,11 @@ def test_explicit_transfer_recovery_is_bounded_and_still_requires_registered_pla
         planned = plan_interpreted_task(
             task,
             sources={"current_turn": text},
-            messages=[SimpleNamespace(type="human", id=f"turn-{expected_currency or 'none'}", content=text)],
+            messages=[
+                SimpleNamespace(
+                    type="human", id=f"turn-{expected_currency or 'none'}", content=text
+                )
+            ],
             context={"accounts": []},
         )
         assert planned["status"] == "PLANNED"
@@ -283,12 +304,15 @@ def test_explicit_transfer_recovery_is_bounded_and_still_requires_registered_pla
         assert planned["arguments"] == {"name_query": "John"}
 
     assert safe_explicit_transfer_assessment("send money later", {"accounts": []}) is None
-    assert safe_explicit_transfer_assessment("send 50 to my savings account", {"accounts": []}) is None
+    assert (
+        safe_explicit_transfer_assessment("send 50 to my savings account", {"accounts": []}) is None
+    )
 
 
 def test_assessment_prompt_explains_confidence_applicability_and_helpful_broad_checkin():
     prompt = build_assessment_prompt(
-        intent_candidates=[], catalogue=task_prompt_catalogue(),
+        intent_candidates=[],
+        catalogue=task_prompt_catalogue(),
     )
     assert "If you extract any slots, provide slot_confidence" in prompt
     assert "broad check-in" in prompt

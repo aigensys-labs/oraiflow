@@ -39,8 +39,13 @@ def test_decision_routing_policy_is_strict_versioned_and_human_editable():
         [item.priority for item in policy.pre_assessment_routes], reverse=True
     )
     assert {item.task_class for item in policy.task_dispatch} == {
-        "resource", "mcp_read", "presentation", "workflow",
-        "frontend_action", "clarification", "unsupported",
+        "resource",
+        "mcp_read",
+        "presentation",
+        "workflow",
+        "frontend_action",
+        "clarification",
+        "unsupported",
     }
     assert policy.interpreter.assessment_calls_per_new_turn == 1
     assert policy.interpreter.may_select_tools is False
@@ -51,7 +56,9 @@ def test_decision_routing_policy_is_strict_versioned_and_human_editable():
 def test_decision_policy_rejects_duplicate_priorities_and_unknown_handlers():
     source = json.loads((ROOT / "shared/contracts/decision_routing.json").read_text())
     duplicate_priority = copy.deepcopy(source)
-    duplicate_priority["pre_assessment_routes"][1]["priority"] = duplicate_priority["pre_assessment_routes"][0]["priority"]
+    duplicate_priority["pre_assessment_routes"][1]["priority"] = duplicate_priority[
+        "pre_assessment_routes"
+    ][0]["priority"]
     with pytest.raises(ValidationError):
         DecisionRoutingPolicy.model_validate(duplicate_priority)
 
@@ -70,13 +77,18 @@ def test_decision_policy_can_disable_or_reorder_only_registered_routes():
     policy = load_decision_routing_policy()
     enabled = ordered_pre_assessment_routes(policy)
     assert enabled[0].handler == "academy_personal_read"
-    disabled_policy = policy.model_copy(update={
-        "pre_assessment_routes": [
-            route.model_copy(update={"enabled": False})
-            if route.handler == "academy_personal_read" else route
-            for route in policy.pre_assessment_routes
-        ]
-    })
+    disabled_policy = policy.model_copy(
+        update={
+            "pre_assessment_routes": [
+                (
+                    route.model_copy(update={"enabled": False})
+                    if route.handler == "academy_personal_read"
+                    else route
+                )
+                for route in policy.pre_assessment_routes
+            ]
+        }
+    )
     assert ordered_pre_assessment_routes(disabled_policy)[0].handler == "workspace_navigation"
 
     payload = policy.model_dump(mode="json")
@@ -86,11 +98,15 @@ def test_decision_policy_can_disable_or_reorder_only_registered_routes():
     by_handler["assistant_capabilities"]["priority"] = 110
     by_handler["academy_personal_read"]["priority"] = 100
     payload["pre_assessment_routes"] = sorted(
-        by_handler.values(), key=lambda item: item["priority"], reverse=True,
+        by_handler.values(),
+        key=lambda item: item["priority"],
+        reverse=True,
     )
     reordered = DecisionRoutingPolicy.model_validate(payload)
     reordered_map = build_agent_decision_map(get_registry(), reordered)
-    assert reordered_map["policy"]["pre_assessment_routes"][0]["handler"] == "assistant_capabilities"
+    assert (
+        reordered_map["policy"]["pre_assessment_routes"][0]["handler"] == "assistant_capabilities"
+    )
     assert task_dispatch_for_class("resource", policy).handler == "registered_resource"
 
 
@@ -99,20 +115,30 @@ def test_decision_map_is_derived_from_occf_and_contains_no_duplicate_phrase_pars
     policy = load_decision_routing_policy()
     decision_map = build_agent_decision_map(registry, policy)
     assert {item["intent_id"] for item in decision_map["intents"]} == set(registry["intents"])
-    assert {item["capability_id"] for item in decision_map["capabilities"]} <= set(registry["capabilities"])
-    assert {item["workspace_id"] for item in decision_map["resources"]["workspaces"]} == set(registry["application_policy"]["workspaces"])
+    assert {item["capability_id"] for item in decision_map["capabilities"]} <= set(
+        registry["capabilities"]
+    )
+    assert {item["workspace_id"] for item in decision_map["resources"]["workspaces"]} == set(
+        registry["application_policy"]["workspaces"]
+    )
     assert {item["topic_id"] for item in decision_map["resources"]["academy_topics"]} == {
         item["topic_id"] for item in registry["application_policy"]["academy_topics"]
     }
-    assert all("examples" not in item and "keywords" not in item for item in decision_map["intents"])
-    transfer = next(item for item in decision_map["intents"] if item["intent_id"] == "TRANSFER_PREPARATION")
+    assert all(
+        "examples" not in item and "keywords" not in item for item in decision_map["intents"]
+    )
+    transfer = next(
+        item for item in decision_map["intents"] if item["intent_id"] == "TRANSFER_PREPARATION"
+    )
     assert transfer["optional_slots"] == ["currency", "source_account", "source_account_preference"]
-    assert transfer["slot_values"]["source_account_preference"] == ["highest_balance", "lowest_balance"]
+    assert transfer["slot_values"]["source_account_preference"] == [
+        "highest_balance",
+        "lowest_balance",
+    ]
     assert decision_map["policy"]["registry_version"] == "1.5.17"
     assert decision_map["policy"]["schema_version"] == "1.0.0"
     assert "workflow_rule" in decision_map
     assert "The runtime maps validated intent" in " ".join(decision_map["authority_rules"])
-
 
 
 def test_human_policy_json_conforms_to_published_json_schema():
@@ -140,6 +166,7 @@ def test_prompt_map_honors_human_route_priority_and_task_confidence_profiles():
     assert dispatch["workflow"]["applicable_confidence_dimensions"] == ["intent", "slot", "entity"]
     assert dispatch["workflow"]["low_confidence_behavior"] == "preserve_workflow_and_clarify"
     assert dispatch["resource"]["low_confidence_behavior"] == "clarify_resource_or_topic"
+
 
 def test_intent_task_classes_are_derived_from_registered_execution_plans():
     registry = get_registry()
@@ -170,7 +197,9 @@ def test_compact_decision_map_is_injected_as_the_single_authoritative_catalogue(
     assert "Loans" in prompt
     assert "CREDIT_SCORE_BASICS" in prompt
     assert "Never call or select MCP tools" in prompt
-    transaction = next(item for item in decision_map["intents"] if item["intent_id"] == "TRANSACTION_EXPLANATION")
+    transaction = next(
+        item for item in decision_map["intents"] if item["intent_id"] == "TRANSACTION_EXPLANATION"
+    )
     selector = transaction["semantic_inputs"]["transaction_selector"]
     assert selector["default"] == "latest"
     assert selector["default_policy"] == "when_unspecified"
@@ -178,14 +207,21 @@ def test_compact_decision_map_is_injected_as_the_single_authoritative_catalogue(
     assert "newest" in selector["description"]
     assert "argument_mappings" not in selector
     assert "Task resolution NEEDS_CLARIFICATION is a provisional assessment" in prompt
-    assert "the payment I made most recently" not in prompt  # The model must generalize, not memorize one phrase.
+    assert (
+        "the payment I made most recently" not in prompt
+    )  # The model must generalize, not memorize one phrase.
     # The new decision map stays materially smaller than the old full catalogue
     # projection (which included every phrase, keyword and complete topic text).
     assert len(json.dumps(decision_map, ensure_ascii=False)) < 24_000
-    transaction_intent = next(item for item in decision_map["intents"] if item["intent_id"] == "TRANSACTION_ANALYSIS")
+    transaction_intent = next(
+        item for item in decision_map["intents"] if item["intent_id"] == "TRANSACTION_ANALYSIS"
+    )
     assert "semantic_inputs" in transaction_intent
     assert "argument_mappings" not in json.dumps(decision_map, ensure_ascii=False)
-    assert any("TRANSACTION_ANALYSIS" in item.get("serves_intents", []) for item in decision_map["capabilities"])
+    assert any(
+        "TRANSACTION_ANALYSIS" in item.get("serves_intents", [])
+        for item in decision_map["capabilities"]
+    )
 
 
 def test_resource_intent_plans_without_fabricating_a_backend_capability():
@@ -227,7 +263,9 @@ def test_resource_intent_explains_academy_without_an_executable_mcp_tool():
         context={},
     )
     answer = render_registered_resource_response(
-        planned["resource_id"], planned["resource_references"], text,
+        planned["resource_id"],
+        planned["resource_references"],
+        text,
     )
     assert planned["status"] == "RESOURCE_READY"
     assert answer and "Academy" in answer and "Learning paths" in answer
@@ -250,12 +288,13 @@ def test_workspace_resource_intent_resolves_registered_workspace_metadata():
         context={},
     )
     answer = render_registered_resource_response(
-        planned["resource_id"], planned["resource_references"], text,
+        planned["resource_id"],
+        planned["resource_references"],
+        text,
     )
     assert planned["status"] == "RESOURCE_READY"
     assert planned["resource_references"]["workspace"] == "Loans"
     assert answer and "Loans" in answer
-
 
 
 def test_transfer_intent_contract_exposes_optional_currency_and_source_preferences():
@@ -290,7 +329,11 @@ def test_transfer_intent_contract_rejects_undeclared_slots_and_preferences():
         intent_id="TRANSFER_PREPARATION",
         requested_outcome="ACTION",
         resolution="READY",
-        slots={"amount": "50", "currency": "EUR", "unknown_router_override": "banking.accounts.list"},
+        slots={
+            "amount": "50",
+            "currency": "EUR",
+            "unknown_router_override": "banking.accounts.list",
+        },
         entities={"beneficiary": "John"},
         evidence=[TaskEvidence(field="intent", source="current_turn", quote=text)],
         intent_confidence=0.96,
@@ -306,9 +349,11 @@ def test_transfer_intent_contract_rejects_undeclared_slots_and_preferences():
     assert planned["status"] == "REJECTED"
     assert planned["reason_code"] == "UNDECLARED_INTENT_SLOT"
 
-    valid_fields_but_invalid_value = task.model_copy(update={
-        "slots": {"amount": "50", "currency": "EUR", "source_account_preference": "largest"}
-    })
+    valid_fields_but_invalid_value = task.model_copy(
+        update={
+            "slots": {"amount": "50", "currency": "EUR", "source_account_preference": "largest"}
+        }
+    )
     planned = plan_interpreted_task(
         valid_fields_but_invalid_value,
         sources={"current_turn": text},
@@ -317,6 +362,7 @@ def test_transfer_intent_contract_rejects_undeclared_slots_and_preferences():
     )
     assert planned["status"] == "CLARIFICATION_REQUIRED"
     assert planned["reason_code"] == "INTENT_SLOT_VALUE_UNSUPPORTED"
+
 
 def test_decision_policy_does_not_define_or_duplicate_capability_schemas():
     policy_payload = json.loads((ROOT / "shared/contracts/decision_routing.json").read_text())

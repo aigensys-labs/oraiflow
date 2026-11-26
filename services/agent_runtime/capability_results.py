@@ -4,6 +4,7 @@ This module intentionally depends only on OCCF contracts and message-like
 objects. It does not import LangChain or graph runtime types, so result-state
 classification remains independently testable.
 """
+
 from __future__ import annotations
 
 import json
@@ -23,13 +24,26 @@ from shared.pending_task import message_type, message_value
 
 logger = logging.getLogger("oraiflow.agent_runtime.capability_results")
 _MONTH_ABBREVIATIONS = (
-    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
 )
 
 
 def capability_result_diagnostic(
-    messages: list[Any], capability_id: str, *, trace_id: str = "-",
+    messages: list[Any],
+    capability_id: str,
+    *,
+    trace_id: str = "-",
 ) -> tuple[bool, dict[str, Any] | None, str | None, str | None, str | None]:
     """Return a validated current-turn result and precise diagnostic fields.
 
@@ -44,7 +58,7 @@ def capability_result_diagnostic(
         (index for index, message in enumerate(messages or []) if message_type(message) == "human"),
         default=-1,
     )
-    for message in reversed((messages or [])[latest_user_index + 1:]):
+    for message in reversed((messages or [])[latest_user_index + 1 :]):
         if message_type(message) != "tool" or message_value(message, "name", "") != tool_name:
             continue
 
@@ -57,8 +71,13 @@ def capability_result_diagnostic(
 
         raw_outcome = str(envelope.get("outcome", "UNKNOWN")).upper()
         allowed_outcomes = {
-            "SUCCESS", "EMPTY", "PARTIAL", "INVALID_INPUT", "REJECTED",
-            "UNAVAILABLE", "INVALID_RESPONSE",
+            "SUCCESS",
+            "EMPTY",
+            "PARTIAL",
+            "INVALID_INPUT",
+            "REJECTED",
+            "UNAVAILABLE",
+            "INVALID_RESPONSE",
         }
         outcome = raw_outcome if raw_outcome in allowed_outcomes else "UNKNOWN"
         error = envelope.get("error") if isinstance(envelope.get("error"), dict) else {}
@@ -86,9 +105,13 @@ def capability_result_diagnostic(
             output_schema = contract.get("output_schema", {})
             if output_schema.get("type") == "array":
                 if not isinstance(data, list):
-                    return _reject(trace_id, capability_id, "INVALID_DATA_SHAPE", outcome, error_code)
+                    return _reject(
+                        trace_id, capability_id, "INVALID_DATA_SHAPE", outcome, error_code
+                    )
                 if any(not isinstance(item, dict) for item in data):
-                    return _reject(trace_id, capability_id, "INVALID_DATA_RECORD", outcome, error_code)
+                    return _reject(
+                        trace_id, capability_id, "INVALID_DATA_RECORD", outcome, error_code
+                    )
             try:
                 validate_capability_output(capability_id, data)
             except ContractViolation:
@@ -112,7 +135,10 @@ def capability_result_diagnostic(
         if not successful:
             logger.warning(
                 "capability_result_not_success trace_id=%s capability=%s outcome=%s error_code=%s",
-                trace_id, capability_id, outcome, error_code or "unknown",
+                trace_id,
+                capability_id,
+                outcome,
+                error_code or "unknown",
             )
             return True, None, f"OUTCOME_{outcome}", outcome, error_code
         return True, envelope, None, outcome, None
@@ -128,17 +154,26 @@ def _reject(
 ) -> tuple[bool, None, str, str | None, str | None]:
     logger.warning(
         "capability_result_rejected trace_id=%s capability=%s reason=%s outcome=%s error_code=%s",
-        trace_id, capability_id, reason, outcome or "unknown", error_code or "unknown",
+        trace_id,
+        capability_id,
+        reason,
+        outcome or "unknown",
+        error_code or "unknown",
     )
     return True, None, reason, outcome, error_code
 
 
 def verified_list_result_diagnostic(
-    messages: list[Any], capability_id: str, *, trace_id: str = "-",
+    messages: list[Any],
+    capability_id: str,
+    *,
+    trace_id: str = "-",
 ) -> tuple[bool, list[dict[str, Any]] | None, str | None, str | None, str | None]:
     """Validate a list-valued result without collapsing connector/schema failures."""
     seen, envelope, reason, outcome, error_code = capability_result_diagnostic(
-        messages, capability_id, trace_id=trace_id,
+        messages,
+        capability_id,
+        trace_id=trace_id,
     )
     if not seen or envelope is None:
         return seen, None, reason, outcome, error_code
@@ -148,7 +183,6 @@ def verified_list_result_diagnostic(
     if any(not isinstance(item, dict) for item in data):
         return True, None, "INVALID_DATA_RECORD", outcome, None
     return True, data, None, outcome, None
-
 
 
 def _format_minor_amount(value: Any, currency: str) -> str:
@@ -230,7 +264,9 @@ def render_transaction_analysis_summary(data: dict[str, Any]) -> str:
             currency = str(row.get("currency") or "")
             amount_minor = row.get("amount_minor")
             if isinstance(amount_minor, int) and not isinstance(amount_minor, bool) and currency:
-                amount = _format_minor_amount(abs(amount_minor) if flow in {"outflows", "inflows"} else amount_minor, currency)
+                amount = _format_minor_amount(
+                    abs(amount_minor) if flow in {"outflows", "inflows"} else amount_minor, currency
+                )
             else:
                 amount = "amount unavailable"
             occurred = str(row.get("occurred_at") or "date unavailable")[:10]
@@ -274,24 +310,29 @@ def render_transaction_analysis_summary(data: dict[str, Any]) -> str:
             group_count = item.get("transaction_count")
             if currency and isinstance(amount_minor, int) and isinstance(group_count, int):
                 amount = _format_minor_amount(amount_minor, currency)
-                detail_lines.append(f"- {value}: {amount} across {group_count} transaction{'s' if group_count != 1 else ''}")
+                detail_lines.append(
+                    f"- {value}: {amount} across {group_count} transaction{'s' if group_count != 1 else ''}"
+                )
         if detail_lines:
             headline += "\nBreakdown:\n" + "\n".join(detail_lines)
 
     if mode == "recurring_inflows":
         recurring = [
-            item for item in groups
+            item
+            for item in groups
             if isinstance(item, dict) and item.get("potentially_recurring") is True
         ]
         if recurring:
-            labels = ", ".join(str(item.get("group_value") or "a recorded description")[:100] for item in recurring[:5])
+            labels = ", ".join(
+                str(item.get("group_value") or "a recorded description")[:100]
+                for item in recurring[:5]
+            )
             headline += f"\nPotentially recurring pattern(s): {labels}. This is a screening signal based on recorded repetitions, not proof of salary, employment or payer identity."
         else:
             headline += "\nThe recorded history does not establish a potentially recurring incoming-payment pattern."
     if data.get("truncated") is True:
         headline += "\nThis is a partial result because the registered result limit was reached."
     return headline
-
 
 
 def render_saved_contact_lookup_summary(data: list[dict[str, Any]]) -> str:
@@ -316,7 +357,8 @@ def render_saved_contact_lookup_summary(data: list[dict[str, Any]]) -> str:
 
     count = len(active)
     heading = (
-        "I found one active saved contact:" if count == 1
+        "I found one active saved contact:"
+        if count == 1
         else f"I found {count} active saved contacts matching that name:"
     )
     if len(active) > 10:
@@ -325,11 +367,15 @@ def render_saved_contact_lookup_summary(data: list[dict[str, Any]]) -> str:
 
 
 def verified_saved_contact_lookup_summary(
-    messages: list[Any] | tuple[Any, ...], *, trace_id: str | None = None,
+    messages: list[Any] | tuple[Any, ...],
+    *,
+    trace_id: str | None = None,
 ) -> str | None:
     """Return contact details only from a validated current-turn MCP result."""
     seen, envelope, reason, _outcome, _error_code = capability_result_diagnostic(
-        list(messages or []), "banking.contacts.search", trace_id=trace_id,
+        list(messages or []),
+        "banking.contacts.search",
+        trace_id=trace_id,
     )
     if not seen or envelope is None or reason is not None:
         return None
@@ -341,11 +387,15 @@ def verified_saved_contact_lookup_summary(
 
 
 def verified_transaction_analysis_summary(
-    messages: list[Any] | tuple[Any, ...], *, trace_id: str | None = None,
+    messages: list[Any] | tuple[Any, ...],
+    *,
+    trace_id: str | None = None,
 ) -> str | None:
     """Return a deterministic summary only from a validated current-turn result."""
     seen, envelope, reason, _outcome, _error_code = capability_result_diagnostic(
-        list(messages or []), "banking.transactions.analyze", trace_id=trace_id,
+        list(messages or []),
+        "banking.transactions.analyze",
+        trace_id=trace_id,
     )
     if not seen or envelope is None or reason is not None:
         return None

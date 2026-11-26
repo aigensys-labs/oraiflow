@@ -4,7 +4,6 @@ from shared.contact_lookup_policy import is_standalone_saved_contact_lookup
 from shared.pending_task import PendingTaskContext, attach_pending_task, latest_pending_task
 from shared.transfer_workflow import latest_pending_workflow, with_workflow
 
-
 CONTACT_CANDIDATE = [{"intent_id": "SAVED_CONTACT_LOOKUP"}]
 
 
@@ -24,11 +23,16 @@ def _transfer_workflow(stage="AWAITING_CONTACT"):
 
 
 def _assistant_with_transfer_state(stage="AWAITING_CONTACT"):
-    message = SimpleNamespace(type="ai", role="assistant", content=(
-        "I found more than one saved contact matching John. Which person did you mean? "
-        "Reply with the full name, a unique surname, bank name or option number. "
-        "No transfer draft has been opened."
-    ), additional_kwargs={})
+    message = SimpleNamespace(
+        type="ai",
+        role="assistant",
+        content=(
+            "I found more than one saved contact matching John. Which person did you mean? "
+            "Reply with the full name, a unique surname, bank name or option number. "
+            "No transfer draft has been opened."
+        ),
+        additional_kwargs={},
+    )
     with_workflow(message, _transfer_workflow(stage))
     return message
 

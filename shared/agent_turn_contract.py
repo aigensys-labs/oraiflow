@@ -5,6 +5,7 @@ server-validated application contract derived from its message, context and
 registered tools; it contains identifiers and capability availability, never
 customer financial values or authorization tokens.
 """
+
 from __future__ import annotations
 
 from typing import Any, Literal
@@ -51,12 +52,15 @@ class AgentTurnResponse(BaseModel):
     turn_id: str = Field(min_length=1, max_length=160)
     message_id: str = Field(min_length=1, max_length=160)
     response_kind: Literal[
-        "TEXT", "CLARIFICATION", "CAPABILITY_REQUEST", "FRONTEND_ACTION_REQUEST",
-        "PRESENTATION", "ERROR",
+        "TEXT",
+        "CLARIFICATION",
+        "CAPABILITY_REQUEST",
+        "FRONTEND_ACTION_REQUEST",
+        "PRESENTATION",
+        "ERROR",
     ]
     finalized: bool
     outcome: dict[str, Any]
-
 
 
 def build_agent_turn_context(
@@ -77,23 +81,32 @@ def build_agent_turn_context(
     when the current UI registered their render tool.
     """
     capabilities = registry.get("capabilities", {})
-    mcp_ids = tuple(sorted(
-        capability_id for capability_id, item in capabilities.items()
-        if item.get("kind") == "mcp"
-        and item.get("authorization", {}).get("agent_invocable") is True
-        and item.get("execution", {}).get("effect") in {"read", "read_only"}
-    ))
-    frontend_ids = tuple(sorted(
-        capability_id for capability_id, item in capabilities.items()
-        if item.get("kind") == "frontend"
-        and item.get("authorization", {}).get("agent_invocable") is True
-        and item.get("execution", {}).get("model_invocable") is True
-        and item.get("name") in available_action_names
-    ))
-    presentation_ids = tuple(sorted(
-        presentation_id for presentation_id, item in registry.get("presentations", {}).items()
-        if item.get("name") in available_action_names
-    ))
+    mcp_ids = tuple(
+        sorted(
+            capability_id
+            for capability_id, item in capabilities.items()
+            if item.get("kind") == "mcp"
+            and item.get("authorization", {}).get("agent_invocable") is True
+            and item.get("execution", {}).get("effect") in {"read", "read_only"}
+        )
+    )
+    frontend_ids = tuple(
+        sorted(
+            capability_id
+            for capability_id, item in capabilities.items()
+            if item.get("kind") == "frontend"
+            and item.get("authorization", {}).get("agent_invocable") is True
+            and item.get("execution", {}).get("model_invocable") is True
+            and item.get("name") in available_action_names
+        )
+    )
+    presentation_ids = tuple(
+        sorted(
+            presentation_id
+            for presentation_id, item in registry.get("presentations", {}).items()
+            if item.get("name") in available_action_names
+        )
+    )
     context = AgentTurnContext(
         registry_version=str(registry.get("registry_version", "unknown")),
         turn_id=str(turn_id)[:160],
@@ -104,8 +117,11 @@ def build_agent_turn_context(
         intent_candidates=intent_candidates,
     )
     from shared.contracts.registry import get_registry, validate_schema
+
     validate_schema(
-        "agent_turn_context", "request", get_registry()["agent_turn_context_schema"],
+        "agent_turn_context",
+        "request",
+        get_registry()["agent_turn_context_schema"],
         context.model_dump(mode="json"),
     )
     return context
@@ -153,6 +169,7 @@ def filter_available_ui_actions(
             selected.append(action)
     return tuple(selected)
 
+
 def replace_assistant_message_content(
     message: Any,
     *,
@@ -189,6 +206,7 @@ def replace_assistant_message_content(
         setattr(cloned, field, value)
     return cloned
 
+
 def attach_agent_turn_response(message: Any, *, turn_id: str, outcome: dict[str, Any]) -> Any:
     """Return a message with a validated response receipt, preserving its identity/content."""
     from copy import deepcopy
@@ -200,7 +218,8 @@ def attach_agent_turn_response(message: Any, *, turn_id: str, outcome: dict[str,
     if call_names:
         registry = get_registry()
         frontend_names = {
-            str(item.get("name")) for item in registry.get("capabilities", {}).values()
+            str(item.get("name"))
+            for item in registry.get("capabilities", {}).values()
             if item.get("kind") == "frontend"
         }
         presentation_names = {
@@ -215,12 +234,24 @@ def attach_agent_turn_response(message: Any, *, turn_id: str, outcome: dict[str,
         finalized = False
     else:
         content = getattr(message, "content", "")
-        text = content if isinstance(content, str) else " ".join(
-            str(part.get("text", "")) if isinstance(part, dict) else str(part)
-            for part in content if isinstance(content, list)
+        text = (
+            content
+            if isinstance(content, str)
+            else " ".join(
+                str(part.get("text", "")) if isinstance(part, dict) else str(part)
+                for part in content
+                if isinstance(content, list)
+            )
         )
         normalized = str(text or "").casefold()
-        response_kind = "CLARIFICATION" if any(term in normalized for term in ("which", "could you clarify", "do you mean", "are you asking")) else "TEXT"
+        response_kind = (
+            "CLARIFICATION"
+            if any(
+                term in normalized
+                for term in ("which", "could you clarify", "do you mean", "are you asking")
+            )
+            else "TEXT"
+        )
         finalized = True
 
     # A turn may contain several internal assistant/tool-request messages.
@@ -244,7 +275,9 @@ def attach_agent_turn_response(message: Any, *, turn_id: str, outcome: dict[str,
     )
     receipt_payload = receipt.model_dump(mode="json")
     validate_schema(
-        "agent_turn_response", "response", get_registry()["agent_turn_response_schema"],
+        "agent_turn_response",
+        "response",
+        get_registry()["agent_turn_response_schema"],
         receipt_payload,
     )
     metadata = deepcopy(getattr(message, "additional_kwargs", {}) or {})

@@ -5,6 +5,7 @@ This is deliberately NOT an OIDC/JWT implementation. The demo customer and
 untrusted request headers. Production deployments must replace this resolver
 with a verified OIDC resource-server implementation.
 """
+
 from __future__ import annotations
 
 import os
@@ -27,18 +28,20 @@ def current_demo_identity() -> IdentityContext:
         subject=os.getenv("DEMO_USER_ID", "user-001"),
         tenant_id=os.getenv("DEMO_TENANT_ID", "tenant-demo"),
         authentication_method="local-demo-config",
-        capabilities=frozenset({
-            "accounts:read",
-            "profile:update",
-            "transactions:read",
-            "contacts:read",
-            "loans:read",
-            "financial_health:read",
-            "payments:preview",
-            "payments:confirm",
-            "payments:read",
-            "audit:read",
-        }),
+        capabilities=frozenset(
+            {
+                "accounts:read",
+                "profile:update",
+                "transactions:read",
+                "contacts:read",
+                "loans:read",
+                "financial_health:read",
+                "payments:preview",
+                "payments:confirm",
+                "payments:read",
+                "audit:read",
+            }
+        ),
     )
 
 

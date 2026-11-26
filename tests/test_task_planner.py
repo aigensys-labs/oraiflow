@@ -16,25 +16,29 @@ def _message(message_id: str, content: str):
 def test_internal_task_plan_is_a_strict_versioned_contract():
     valid = {
         "schema_version": "1.0.0",
-        "tasks": [{
-            "task_id": "task-1",
-            "intent_id": "LOAN_INFORMATION",
-            "status_hint": "PLANNED",
-            "capability_ids": ["banking.loans.overview"],
-            "capability_id": "banking.loans.overview",
-            "kind": "mcp",
-            "tool_name": "get_customer_loan_overview",
-            "arguments": {},
-        }],
+        "tasks": [
+            {
+                "task_id": "task-1",
+                "intent_id": "LOAN_INFORMATION",
+                "status_hint": "PLANNED",
+                "capability_ids": ["banking.loans.overview"],
+                "capability_id": "banking.loans.overview",
+                "kind": "mcp",
+                "tool_name": "get_customer_loan_overview",
+                "arguments": {},
+            }
+        ],
     }
     parsed = TurnTaskPlan.model_validate(valid)
     assert parsed.schema_version == "1.0.0"
     assert parsed.tasks[0].intent_id == "LOAN_INFORMATION"
 
-    with_deadline = TurnTaskPlan.model_validate({
-        **valid,
-        "model_deadline_epoch": 1_800_000_000.0,
-    })
+    with_deadline = TurnTaskPlan.model_validate(
+        {
+            **valid,
+            "model_deadline_epoch": 1_800_000_000.0,
+        }
+    )
     assert with_deadline.model_deadline_epoch == 1_800_000_000.0
 
     invalid = {**valid, "tasks": [{**valid["tasks"][0], "model_selected_capability": "evil"}]}
@@ -44,8 +48,11 @@ def test_internal_task_plan_is_a_strict_versioned_contract():
 
 def test_task_outcome_is_a_typed_independent_terminal_record():
     outcome = TurnTaskOutcome(
-        task_id="task-1", intent_id="RECENT_TRANSACTIONS", status="UNAVAILABLE",
-        capability_ids=("banking.transactions.recent",), reason_code="MCP_TIMEOUT",
+        task_id="task-1",
+        intent_id="RECENT_TRANSACTIONS",
+        status="UNAVAILABLE",
+        capability_ids=("banking.transactions.recent",),
+        reason_code="MCP_TIMEOUT",
     )
     assert outcome.status == "UNAVAILABLE"
     assert outcome.reason_code == "MCP_TIMEOUT"
@@ -109,7 +116,6 @@ def test_planner_requires_conversation_references_to_resolve_exactly():
     )
     assert planned["status"] == "CLARIFICATION_REQUIRED"
     assert planned["reason_code"] == "CONVERSATION_REFERENCE_UNRESOLVED"
-
 
 
 def test_transaction_analysis_compiles_semantic_filters_to_the_registered_read_capability():
@@ -194,8 +200,10 @@ def test_transaction_analysis_does_not_accept_unsupported_group_or_filter_values
         ],
     )
     planned = plan_interpreted_task(
-        task, sources={"current_turn": text},
-        messages=[_message("analysis-3", text)], context={},
+        task,
+        sources={"current_turn": text},
+        messages=[_message("analysis-3", text)],
+        context={},
     )
     assert planned["status"] == "CLARIFICATION_REQUIRED"
     assert planned["reason_code"] == "INTENT_SEMANTIC_VALUE_UNSUPPORTED"
@@ -219,8 +227,10 @@ def test_transaction_analysis_normalizes_merchant_filter_to_occf_entity_location
         ],
     )
     planned = plan_interpreted_task(
-        task, sources={"current_turn": text},
-        messages=[_message("analysis-merchant-slot", text)], context={},
+        task,
+        sources={"current_turn": text},
+        messages=[_message("analysis-merchant-slot", text)],
+        context={},
     )
     assert planned["status"] == "PLANNED"
     assert planned["arguments"]["flow"] == "outflows"
@@ -244,8 +254,10 @@ def test_transaction_analysis_uses_registered_period_default_for_coffee_query():
         ],
     )
     planned = plan_interpreted_task(
-        task, sources={"current_turn": text},
-        messages=[_message("analysis-default-1", text)], context={},
+        task,
+        sources={"current_turn": text},
+        messages=[_message("analysis-default-1", text)],
+        context={},
     )
     assert planned["status"] == "PLANNED"
     assert planned["arguments"]["period"] == "last_30_days"
@@ -274,8 +286,10 @@ def test_salary_query_uses_long_screening_default_without_requiring_employer():
         ],
     )
     planned = plan_interpreted_task(
-        task, sources={"current_turn": text},
-        messages=[_message("analysis-salary-last-month", text)], context={},
+        task,
+        sources={"current_turn": text},
+        messages=[_message("analysis-salary-last-month", text)],
+        context={},
     )
     assert planned["status"] == "PLANNED"
     assert planned["arguments"]["period"] == "last_month"
@@ -353,5 +367,7 @@ def test_explicit_customer_flow_phrase_overrides_model_all_fallback():
 def test_longer_registered_all_activity_phrase_suppresses_nested_flow_words():
     from services.agent_runtime.task_planner import _semantic_value_from_customer_text
 
-    flow_spec = get_registry()["intents"]["TRANSACTION_ANALYSIS"]["execution_plan"]["semantic_inputs"]["flow"]
+    flow_spec = get_registry()["intents"]["TRANSACTION_ANALYSIS"]["execution_plan"][
+        "semantic_inputs"
+    ]["flow"]
     assert _semantic_value_from_customer_text(flow_spec, "Show income versus expenses") == "all"

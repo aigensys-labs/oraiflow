@@ -6,6 +6,7 @@ not accumulate customer-phrase branches. A discovery result is only a routing
 hint. OCCF validation, InterpretationAssessment and banking authorization remain
 independent mandatory gates.
 """
+
 from __future__ import annotations
 
 import re
@@ -53,7 +54,10 @@ def _edit_distance_at_most(left: str, right: str, limit: int) -> int | None:
 
 
 def _typo_hint_score(
-    query_tokens: set[str], phrases: list[Any], keywords: list[Any], description: str,
+    query_tokens: set[str],
+    phrases: list[Any],
+    keywords: list[Any],
+    description: str,
 ) -> tuple[int, str | None]:
     """Return a weak intent hint for a likely typo anchored by another word.
 
@@ -63,21 +67,55 @@ def _typo_hint_score(
     accidental matches between unrelated financial concepts.
     """
     vocabulary_phrases = [
-        str(value) for value in [*phrases, *keywords, description]
+        str(value)
+        for value in [*phrases, *keywords, description]
         if isinstance(value, str) and value.strip()
     ]
     stopwords = {
-        "about", "after", "again", "also", "any", "are", "can", "could", "does",
-        "for", "from", "have", "into", "just", "like", "mine", "more", "most",
-        "much", "need", "please", "show", "some", "that", "them", "there", "this",
-        "what", "when", "where", "which", "with", "would", "your",
+        "about",
+        "after",
+        "again",
+        "also",
+        "any",
+        "are",
+        "can",
+        "could",
+        "does",
+        "for",
+        "from",
+        "have",
+        "into",
+        "just",
+        "like",
+        "mine",
+        "more",
+        "most",
+        "much",
+        "need",
+        "please",
+        "show",
+        "some",
+        "that",
+        "them",
+        "there",
+        "this",
+        "what",
+        "when",
+        "where",
+        "which",
+        "with",
+        "would",
+        "your",
     }
     best_score = 0
     best_target: str | None = None
-    meaningful_query = {token for token in query_tokens if len(token) >= 4 and token not in stopwords}
+    meaningful_query = {
+        token for token in query_tokens if len(token) >= 4 and token not in stopwords
+    }
     for phrase in vocabulary_phrases:
         target_tokens = {
-            token for token in _normalise(phrase).split()
+            token
+            for token in _normalise(phrase).split()
             if len(token) >= 4 and token not in stopwords
         }
         if not target_tokens:
@@ -108,10 +146,18 @@ def _typo_hint_score(
         # A single typo is meaningful only when the same registry phrase also
         # contains a word the customer wrote correctly.
         if fuzzy_targets and exact_anchors:
-            score = min(84, 36 + 20 * min(len({target for target, _ in fuzzy_targets}), 2) + 4 * min(exact_anchors, 2))
+            score = min(
+                84,
+                36
+                + 20 * min(len({target for target, _ in fuzzy_targets}), 2)
+                + 4 * min(exact_anchors, 2),
+            )
             # Preserve the singular/plural distinction between a single latest
             # transaction and a recent-transaction list when both are plausible.
-            if all(target.endswith("s") and not query_token.endswith("s") for target, query_token in fuzzy_targets):
+            if all(
+                target.endswith("s") and not query_token.endswith("s")
+                for target, query_token in fuzzy_targets
+            ):
                 score = max(1, score - 8)
             if score > best_score:
                 best_score = score
@@ -154,11 +200,14 @@ def discover_intent_candidates(text: str, *, limit: int = 5) -> list[dict[str, A
         phrases = discovery.get("phrases", [])
         if isinstance(phrases, list):
             matching_phrases = [
-                _normalise(phrase) for phrase in phrases
+                _normalise(phrase)
+                for phrase in phrases
                 if _normalise(phrase) and f" {_normalise(phrase)} " in padded_query
             ]
             if matching_phrases:
-                matched_phrase = max(matching_phrases, key=lambda value: (len(value.split()), len(value)))
+                matched_phrase = max(
+                    matching_phrases, key=lambda value: (len(value.split()), len(value))
+                )
                 # A full customer phrase is strong semantic evidence. Longer
                 # phrases carry a little more specificity, not more authority.
                 # A declared full phrase outranks broad regex patterns from a
@@ -187,7 +236,11 @@ def discover_intent_candidates(text: str, *, limit: int = 5) -> list[dict[str, A
             fuzzy_score, fuzzy_token = _typo_hint_score(
                 query_tokens,
                 phrases if isinstance(phrases, list) else [],
-                discovery.get("keywords", []) if isinstance(discovery.get("keywords", []), list) else [],
+                (
+                    discovery.get("keywords", [])
+                    if isinstance(discovery.get("keywords", []), list)
+                    else []
+                ),
                 str(contract.get("description", "")),
             )
             if fuzzy_score:
@@ -201,7 +254,8 @@ def discover_intent_candidates(text: str, *, limit: int = 5) -> list[dict[str, A
             patterns = recognition.get("patterns", [])
             deterministic_match = any(
                 re.search(pattern, pattern_query, re.IGNORECASE)
-                for pattern in patterns if isinstance(pattern, str)
+                for pattern in patterns
+                if isinstance(pattern, str)
             )
             if deterministic_match:
                 score = max(score, 1000)
@@ -215,38 +269,47 @@ def discover_intent_candidates(text: str, *, limit: int = 5) -> list[dict[str, A
         supporting = plan.get("supporting_capabilities", [])
         if not capability_id and supporting:
             capability_id = supporting[0]
-        capability = get_registry().get("capabilities", {}).get(capability_id, {}) if capability_id else {}
-        candidates.append({
-            "intent_id": intent_id,
-            "description": str(contract.get("description", "")),
-            "capability_id": capability_id,
-            "capability_name": str(capability.get("name", "")),
-            "presentation": plan.get("presentation"),
-            "response_mode": plan.get("response_mode"),
-            "score": score,
-            "match_kind": match_kind,
-            "matched_phrase": matched_phrase,
-            "matched_typo_token": fuzzy_token,
-            # Only exact registry phrases and deterministic patterns may feed
-            # the canonical fast path. Fuzzy discovery is always LLM-only.
-            "auto_resolve": (
-                match_kind in {"semantic_phrase", "deterministic_pattern"}
-                and (bool(discovery.get("auto_resolve", False)) or deterministic_match)
-            ),
-            "minimum_score": int(discovery.get("minimum_score", 1100 if match_kind == "semantic_phrase" else 1000)),
-        })
+        capability = (
+            get_registry().get("capabilities", {}).get(capability_id, {}) if capability_id else {}
+        )
+        candidates.append(
+            {
+                "intent_id": intent_id,
+                "description": str(contract.get("description", "")),
+                "capability_id": capability_id,
+                "capability_name": str(capability.get("name", "")),
+                "presentation": plan.get("presentation"),
+                "response_mode": plan.get("response_mode"),
+                "score": score,
+                "match_kind": match_kind,
+                "matched_phrase": matched_phrase,
+                "matched_typo_token": fuzzy_token,
+                # Only exact registry phrases and deterministic patterns may feed
+                # the canonical fast path. Fuzzy discovery is always LLM-only.
+                "auto_resolve": (
+                    match_kind in {"semantic_phrase", "deterministic_pattern"}
+                    and (bool(discovery.get("auto_resolve", False)) or deterministic_match)
+                ),
+                "minimum_score": int(
+                    discovery.get(
+                        "minimum_score", 1100 if match_kind == "semantic_phrase" else 1000
+                    )
+                ),
+            }
+        )
 
     # Deterministic registry order provides stable tie-breaking; an ambiguous
     # result remains ambiguous and is never silently converted into an action.
     candidates.sort(key=lambda item: (-int(item["score"]), str(item["intent_id"])))
-    return candidates[:max(1, int(limit))]
+    return candidates[: max(1, int(limit))]
 
 
 def classify_canonical_read_intent(text: str) -> str | None:
     """Return only an unambiguous, registry-authorized canonical read intent."""
     candidates = discover_intent_candidates(text, limit=5)
     eligible = [
-        item for item in candidates
+        item
+        for item in candidates
         if item["auto_resolve"] and item["score"] >= item["minimum_score"]
     ]
     if not eligible:
@@ -273,7 +336,10 @@ def classify_canonical_read_intent(text: str) -> str | None:
     registry_capabilities = get_registry().get("capabilities", {})
     for item_id in read_capabilities:
         item = registry_capabilities.get(item_id, {})
-        if item.get("kind") != "mcp" or item.get("authorization", {}).get("agent_invocable") is not True:
+        if (
+            item.get("kind") != "mcp"
+            or item.get("authorization", {}).get("agent_invocable") is not True
+        ):
             return None
         if item.get("execution", {}).get("effect") not in {"read", "read_only"}:
             return None
@@ -292,20 +358,28 @@ def intent_discovery_context(text: str, *, limit: int = 4) -> list[dict[str, Any
             discovery = {}
         phrases = discovery.get("phrases", [])
         keywords = discovery.get("keywords", [])
-        result.append({
-            "intent_id": item["intent_id"],
-            "description": item["description"],
-            "capability_id": item["capability_id"],
-            "capability_name": item["capability_name"],
-            "response_mode": item["response_mode"],
-            "match_kind": item["match_kind"],
-            "matched_phrase": item.get("matched_phrase"),
-            "matched_typo_token": item.get("matched_typo_token"),
-            # Keep semantic vocabulary scoped to the candidates relevant to this
-            # customer turn. The registry remains the authoritative source for
-            # application and capability decisions.
-            "registered_phrases": [str(value)[:100] for value in phrases[:5]] if isinstance(phrases, list) else [],
-            "registered_keywords": [str(value)[:70] for value in keywords[:8]] if isinstance(keywords, list) else [],
-            "score": item["score"],
-        })
+        result.append(
+            {
+                "intent_id": item["intent_id"],
+                "description": item["description"],
+                "capability_id": item["capability_id"],
+                "capability_name": item["capability_name"],
+                "response_mode": item["response_mode"],
+                "match_kind": item["match_kind"],
+                "matched_phrase": item.get("matched_phrase"),
+                "matched_typo_token": item.get("matched_typo_token"),
+                # Keep semantic vocabulary scoped to the candidates relevant to this
+                # customer turn. The registry remains the authoritative source for
+                # application and capability decisions.
+                "registered_phrases": (
+                    [str(value)[:100] for value in phrases[:5]] if isinstance(phrases, list) else []
+                ),
+                "registered_keywords": (
+                    [str(value)[:70] for value in keywords[:8]]
+                    if isinstance(keywords, list)
+                    else []
+                ),
+                "score": item["score"],
+            }
+        )
     return result

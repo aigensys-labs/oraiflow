@@ -22,20 +22,45 @@ def _mark_transfer_executing_sync(command_id: str) -> dict:
     from shared.audit import append_audit_event
 
     with get_engine().begin() as conn:
-        row = conn.execute(text("""
+        row = (
+            conn.execute(
+                text("""
             UPDATE transfer_commands
                SET status='EXECUTING', updated_at=NOW()
              WHERE command_id=:id AND status='PENDING'
             RETURNING status
-        """), {"id": command_id}).mappings().first()
+        """),
+                {"id": command_id},
+            )
+            .mappings()
+            .first()
+        )
         if row:
-            command = conn.execute(text("SELECT user_id, tenant_id FROM transfer_commands WHERE command_id=:id"),
-                                   {"id": command_id}).mappings().first()
-            append_audit_event(conn, command["user_id"], "TRANSFER_EXECUTING", command_id,
-                {"source": "temporal_workflow"}, command["tenant_id"])
+            command = (
+                conn.execute(
+                    text("SELECT user_id, tenant_id FROM transfer_commands WHERE command_id=:id"),
+                    {"id": command_id},
+                )
+                .mappings()
+                .first()
+            )
+            append_audit_event(
+                conn,
+                command["user_id"],
+                "TRANSFER_EXECUTING",
+                command_id,
+                {"source": "temporal_workflow"},
+                command["tenant_id"],
+            )
             return {"command_id": command_id, "status": row["status"], "transitioned": True}
-        current = conn.execute(text("SELECT status FROM transfer_commands WHERE command_id=:id"),
-                               {"id": command_id}).mappings().first()
+        current = (
+            conn.execute(
+                text("SELECT status FROM transfer_commands WHERE command_id=:id"),
+                {"id": command_id},
+            )
+            .mappings()
+            .first()
+        )
         if not current:
             raise ValueError(f"Transfer command {command_id} was not found")
         if current["status"] in ("EXECUTING", "SETTLED"):
@@ -57,10 +82,14 @@ def _settle_transfer_sync(command_id: str) -> dict:
     from shared.audit import append_audit_event
 
     with get_engine().begin() as conn:
-        command = conn.execute(
-            text("SELECT * FROM transfer_commands WHERE command_id = :id FOR UPDATE"),
-            {"id": command_id},
-        ).mappings().first()
+        command = (
+            conn.execute(
+                text("SELECT * FROM transfer_commands WHERE command_id = :id FOR UPDATE"),
+                {"id": command_id},
+            )
+            .mappings()
+            .first()
+        )
         if not command:
             raise ValueError(f"Transfer command {command_id} was not found")
         if command["status"] == "SETTLED":
@@ -77,24 +106,51 @@ def _settle_transfer_sync(command_id: str) -> dict:
         # introduced explicitly and preserve idempotency/reconciliation.
         settlement = get_ledger_adapter().settle_transfer(conn, command)
         if settlement.status != "SETTLED":
-            conn.execute(text("""
+            conn.execute(
+                text("""
                 UPDATE transfer_commands
                    SET status='FAILED', error_message=:reason, updated_at=NOW()
                  WHERE command_id=:id
-            """), {"reason": settlement.reason, "id": command_id})
-            append_audit_event(conn, command["user_id"], "TRANSFER_FAILED", command_id,
-                {"reason": settlement.reason, "stage": "settlement"}, command["tenant_id"])
+            """),
+                {"reason": settlement.reason, "id": command_id},
+            )
+            append_audit_event(
+                conn,
+                command["user_id"],
+                "TRANSFER_FAILED",
+                command_id,
+                {"reason": settlement.reason, "stage": "settlement"},
+                command["tenant_id"],
+            )
             return {"command_id": command_id, "status": "FAILED", "reason": settlement.reason}
 
         conn.execute(
-            text("UPDATE transfer_commands SET status='SETTLED', updated_at=NOW() WHERE command_id=:id"),
+            text(
+                "UPDATE transfer_commands SET status='SETTLED', updated_at=NOW() WHERE command_id=:id"
+            ),
             {"id": command_id},
         )
-        append_audit_event(conn, command["user_id"], "TRANSFER_SETTLED", command_id,
-            {"amount_minor": int(command["amount_minor"]), "currency": command["currency"].strip(),
-             "beneficiary": command["beneficiary"], "source": "temporal_activity",
-             "transaction_id": settlement.transaction_id, "reconciliation_status": "MATCHED"}, command["tenant_id"])
-    return {"command_id": command_id, "status": "SETTLED", "transaction_id": settlement.transaction_id, "idempotent_replay": False}
+        append_audit_event(
+            conn,
+            command["user_id"],
+            "TRANSFER_SETTLED",
+            command_id,
+            {
+                "amount_minor": int(command["amount_minor"]),
+                "currency": command["currency"].strip(),
+                "beneficiary": command["beneficiary"],
+                "source": "temporal_activity",
+                "transaction_id": settlement.transaction_id,
+                "reconciliation_status": "MATCHED",
+            },
+            command["tenant_id"],
+        )
+    return {
+        "command_id": command_id,
+        "status": "SETTLED",
+        "transaction_id": settlement.transaction_id,
+        "idempotent_replay": False,
+    }
 
 
 @activity.defn
@@ -110,18 +166,41 @@ def _mark_transfer_requires_reconciliation_sync(command_id: str, reason: str) ->
 
     message = (reason or "Execution outcome could not be confirmed")[:1000]
     with get_engine().begin() as conn:
-        command = conn.execute(text("""
+        command = (
+            conn.execute(
+                text("""
             UPDATE transfer_commands
                SET status='REQUIRES_RECONCILIATION', error_message=:error, updated_at=NOW()
              WHERE command_id=:id AND status IN ('PENDING','EXECUTING')
             RETURNING user_id, tenant_id
-        """), {"error": message, "id": command_id}).mappings().first()
+        """),
+                {"error": message, "id": command_id},
+            )
+            .mappings()
+            .first()
+        )
         if command:
-            append_audit_event(conn, command["user_id"], "TRANSFER_REQUIRES_RECONCILIATION", command_id,
-                {"reason": message, "source": "temporal_workflow", "automatic_retry_exhausted": True}, command["tenant_id"])
+            append_audit_event(
+                conn,
+                command["user_id"],
+                "TRANSFER_REQUIRES_RECONCILIATION",
+                command_id,
+                {
+                    "reason": message,
+                    "source": "temporal_workflow",
+                    "automatic_retry_exhausted": True,
+                },
+                command["tenant_id"],
+            )
             return {"command_id": command_id, "status": "REQUIRES_RECONCILIATION", "error": message}
-        current = conn.execute(text("SELECT status FROM transfer_commands WHERE command_id=:id"),
-                               {"id": command_id}).mappings().first()
+        current = (
+            conn.execute(
+                text("SELECT status FROM transfer_commands WHERE command_id=:id"),
+                {"id": command_id},
+            )
+            .mappings()
+            .first()
+        )
         if not current:
             raise ValueError(f"Transfer command {command_id} was not found")
         # Never overwrite a known terminal ledger outcome if the activity's
@@ -132,6 +211,7 @@ def _mark_transfer_requires_reconciliation_sync(command_id: str, reason: str) ->
 @workflow.defn
 class TransferWorkflow:
     """Coordinate the lifecycle of a synthetic transfer command using Temporal."""
+
     @workflow.run
     async def run(self, command_id: str) -> dict:
         """Execute the transfer workflow activities for one accepted command identifier."""

@@ -4,6 +4,7 @@ This module provides explanatory text only. Navigation remains a separate
 registered frontend capability, and data access remains behind authenticated
 banking capabilities.
 """
+
 from __future__ import annotations
 
 import re
@@ -83,7 +84,12 @@ def _workspace_aliases() -> dict[str, str]:
 
 
 def _registered_explanation_cue_matches(value: str) -> bool:
-    cues = get_registry().get("application_policy", {}).get("navigation", {}).get("explanation_cues", [])
+    cues = (
+        get_registry()
+        .get("application_policy", {})
+        .get("navigation", {})
+        .get("explanation_cues", [])
+    )
     normalised = " ".join(re.sub(r"[^a-z0-9]+", " ", value.casefold()).split())
     for cue in cues:
         cue_value = " ".join(re.sub(r"[^a-z0-9]+", " ", str(cue).casefold()).split())
@@ -145,19 +151,27 @@ def workspace_explanation_for_request(text: str) -> str | None:
         # Avoid turning “what are my accounts?” or “what are my cards?” into
         # page descriptions. A page-purpose cue or a “tell me about/explain”
         # form makes the customer's explanatory intent clear.
-        explicit_explain = bool(re.search(r"\b(?:explain|describe|tell\s+me\s+(?:more\s+)?about)\b", value))
-        has_context = bool(_EXPLANATION_CONTEXT.search(value)) or _registered_explanation_cue_matches(value)
+        explicit_explain = bool(
+            re.search(r"\b(?:explain|describe|tell\s+me\s+(?:more\s+)?about)\b", value)
+        )
+        has_context = bool(
+            _EXPLANATION_CONTEXT.search(value)
+        ) or _registered_explanation_cue_matches(value)
         # Generic purpose questions such as "what is Academy?" are valid
         # workspace explanations. Resolve the noun against registered aliases
         # rather than requiring the customer to know the word "workspace".
-        simple_purpose_question = bool(re.fullmatch(
-            rf"\s*(?:what\s+is|what(?:'|’)s|tell\s+me\s+about)\s+(?:the\s+)?{re.escape(alias_value)}(?:\s+(?:workspace|tab|page))?\s*[?!.]*\s*",
-            value,
-        ))
-        purpose_question = bool(re.search(
-            rf"(?<![a-z0-9]){re.escape(alias_value)}\s+(?:is\s+for|for\s+what)(?![a-z0-9])",
-            value,
-        ))
+        simple_purpose_question = bool(
+            re.fullmatch(
+                rf"\s*(?:what\s+is|what(?:'|’)s|tell\s+me\s+about)\s+(?:the\s+)?{re.escape(alias_value)}(?:\s+(?:workspace|tab|page))?\s*[?!.]*\s*",
+                value,
+            )
+        )
+        purpose_question = bool(
+            re.search(
+                rf"(?<![a-z0-9]){re.escape(alias_value)}\s+(?:is\s+for|for\s+what)(?![a-z0-9])",
+                value,
+            )
+        )
         if not (explicit_explain or has_context or simple_purpose_question or purpose_question):
             continue
         return workspace_explanation_message(workspace_id)
@@ -172,7 +186,8 @@ def workspace_help_for_request(text: str) -> str | None:
     overview_phrases = policy.get("all_workspaces_phrases", [])
     if _ALL_WORKSPACES_REQUEST.search(value) or any(
         " ".join(re.sub(r"[^a-z0-9]+", " ", str(phrase).casefold()).split()) in normalised
-        for phrase in overview_phrases if str(phrase).strip()
+        for phrase in overview_phrases
+        if str(phrase).strip()
     ):
         return workspace_catalogue_overview_message()
     return workspace_explanation_for_request(value)

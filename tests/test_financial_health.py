@@ -40,8 +40,10 @@ def test_financial_health_keeps_currencies_separate():
 
 def test_negative_deposit_balance_is_recorded_as_overdraft_liability():
     result = calculate_recorded_financial_health(
-        [{"currency": "EUR", "balance_minor": 1_000_000, "status": "ACTIVE"},
-         {"currency": "EUR", "balance_minor": -100_000, "status": "ACTIVE"}],
+        [
+            {"currency": "EUR", "balance_minor": 1_000_000, "status": "ACTIVE"},
+            {"currency": "EUR", "balance_minor": -100_000, "status": "ACTIVE"},
+        ],
         [{"currency": "EUR", "outstanding_principal_minor": 200_000, "demo_only": True}],
         include_demo_loans=True,
     )
@@ -103,7 +105,9 @@ def test_demo_loan_is_excluded_by_default_from_financial_health():
     eur = result["positions"][0]
     assert eur["loan_liabilities_minor"] == 0
     assert eur["recorded_equity_minor"] == 1_000_000
-    assert "opt-in illustrative demo loan outstanding principal" not in result["coverage"]["included"]
+    assert (
+        "opt-in illustrative demo loan outstanding principal" not in result["coverage"]["included"]
+    )
 
 
 def test_demo_loan_can_be_included_only_with_explicit_opt_in():

@@ -1,4 +1,5 @@
 """Shared versioned task outcome contract used by Agent Runtime and UI receipts."""
+
 from __future__ import annotations
 
 from typing import Any, Literal
@@ -14,8 +15,15 @@ class TurnTaskOutcome(BaseModel):
     task_id: str = Field(min_length=1, max_length=160)
     intent_id: str = Field(min_length=1, max_length=80)
     status: Literal[
-        "PLANNED", "SUCCEEDED", "PARTIAL", "EMPTY", "CLARIFICATION_REQUIRED",
-        "REJECTED", "FAILED", "UNAVAILABLE", "NOT_EXECUTED",
+        "PLANNED",
+        "SUCCEEDED",
+        "PARTIAL",
+        "EMPTY",
+        "CLARIFICATION_REQUIRED",
+        "REJECTED",
+        "FAILED",
+        "UNAVAILABLE",
+        "NOT_EXECUTED",
     ]
     capability_ids: tuple[str, ...] = ()
     result_references: tuple[str, ...] = ()
@@ -31,7 +39,9 @@ class TurnTaskPlanEntry(BaseModel):
 
     task_id: str = Field(min_length=1, max_length=160)
     intent_id: str = Field(min_length=1, max_length=80)
-    status_hint: Literal["PLANNED", "CLARIFICATION_REQUIRED", "REJECTED", "UNAVAILABLE", "NOT_EXECUTED"]
+    status_hint: Literal[
+        "PLANNED", "CLARIFICATION_REQUIRED", "REJECTED", "UNAVAILABLE", "NOT_EXECUTED"
+    ]
     reason_code: str | None = Field(default=None, max_length=100)
     missing_fields: tuple[str, ...] = ()
     # Safe semantic continuation state. These values are customer-provided or

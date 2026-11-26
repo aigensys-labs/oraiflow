@@ -4,6 +4,7 @@ This module owns topic matching and educational copy assembly. It does not
 make authorization decisions or perform financial-data reads; personal topics
 only declare which registered intent the Agent Runtime must execute.
 """
+
 from __future__ import annotations
 
 import re
@@ -61,7 +62,9 @@ def academy_topic_matches(text: str, *, limit: int = 3) -> list[tuple[dict[str, 
             continue
         score = 0
         seen_terms: set[str] = set()
-        for keyword in topic.get("keywords", []) if isinstance(topic.get("keywords", []), list) else []:
+        for keyword in (
+            topic.get("keywords", []) if isinstance(topic.get("keywords", []), list) else []
+        ):
             phrase = _normalised_topic_text(str(keyword))
             if not phrase or phrase in seen_terms:
                 continue
@@ -78,12 +81,15 @@ def academy_topic_matches(text: str, *, limit: int = 3) -> list[tuple[dict[str, 
             scored.append((topic, score))
     # Python's stable sort preserves the explicit catalogue order on equal scores.
     scored.sort(key=lambda item: item[1], reverse=True)
-    return scored[:max(1, int(limit))]
+    return scored[: max(1, int(limit))]
 
 
 def _topic_query_relevant(text: str, topic: dict[str, Any]) -> bool:
     topic_id = str(topic.get("topic_id", ""))
-    return any(str(item.get("topic_id", "")) == topic_id for item, _score in academy_topic_matches(text, limit=6))
+    return any(
+        str(item.get("topic_id", "")) == topic_id
+        for item, _score in academy_topic_matches(text, limit=6)
+    )
 
 
 def _topic_has_local_personal_reference(text: str, topic: dict[str, Any]) -> bool:
@@ -94,12 +100,19 @@ def _topic_has_local_personal_reference(text: str, topic: dict[str, Any]) -> boo
     to a keyword/title belonging to the topic that declares the read.
     """
     words = _normalised_topic_text(text).split()
-    owner_terms = get_registry().get("application_policy", {}).get(
-        "academy_personal_reference_terms", ["my", "mine", "our", "ours", "current", "recorded", "personal"],
+    owner_terms = (
+        get_registry()
+        .get("application_policy", {})
+        .get(
+            "academy_personal_reference_terms",
+            ["my", "mine", "our", "ours", "current", "recorded", "personal"],
+        )
     )
     owner_positions = {
-        index for index, word in enumerate(words)
-        if word in {token for term in owner_terms for token in _normalised_topic_text(str(term)).split()}
+        index
+        for index, word in enumerate(words)
+        if word
+        in {token for term in owner_terms for token in _normalised_topic_text(str(term)).split()}
     }
     if not owner_positions:
         return False
@@ -110,10 +123,12 @@ def _topic_has_local_personal_reference(text: str, topic: dict[str, Any]) -> boo
         if not term_words:
             continue
         for start in range(0, len(words) - len(term_words) + 1):
-            if words[start:start + len(term_words)] != term_words:
+            if words[start : start + len(term_words)] != term_words:
                 continue
             end = start + len(term_words) - 1
-            if any(min(abs(position - start), abs(position - end)) <= 4 for position in owner_positions):
+            if any(
+                min(abs(position - start), abs(position - end)) <= 4 for position in owner_positions
+            ):
                 return True
     return False
 
@@ -167,11 +182,16 @@ def academy_direct_guidance_for_request(text: str) -> str | None:
         return None
     best_score = ranked[0][1]
     selected = [
-        topic for topic, score in ranked
+        topic
+        for topic, score in ranked
         if score >= max(2, best_score - 2)
         and str(topic.get("response_policy", "")) == "catalogue_direct"
         and bool(str(topic.get("customer_explanation") or topic.get("description") or "").strip())
-        and bool(topic.get("customer_explanation") or topic.get("description") or topic.get("learning_points"))
+        and bool(
+            topic.get("customer_explanation")
+            or topic.get("description")
+            or topic.get("learning_points")
+        )
     ][:3]
     if not selected:
         return None
@@ -183,7 +203,10 @@ def academy_direct_guidance_for_request(text: str) -> str | None:
 
 
 def academy_catalogue_explanation(
-    text: str, *, topic_ids: list[str] | None = None, require_customer_explanation: bool = False,
+    text: str,
+    *,
+    topic_ids: list[str] | None = None,
+    require_customer_explanation: bool = False,
 ) -> str | None:
     """Build a safe fallback explanation from registered Academy content."""
     catalogue = academy_topic_catalogue()
@@ -198,7 +221,9 @@ def academy_catalogue_explanation(
             # combining loosely related subjects into an unfocused response.
             selected = [topic for topic, score in ranked if score >= max(2, best - 2)][:3]
     if require_customer_explanation:
-        selected = [topic for topic in selected if str(topic.get("customer_explanation") or "").strip()]
+        selected = [
+            topic for topic in selected if str(topic.get("customer_explanation") or "").strip()
+        ]
     if not selected:
         return None
 
@@ -214,10 +239,10 @@ def academy_catalogue_explanation(
             parts.append(f"**{heading}**\n" + "\n".join(f"• {item}" for item in points[:5]))
         limitations = topic.get("limitations", [])
         if isinstance(limitations, list) and limitations:
-            parts.append("**A useful boundary**\n" + " ".join(str(item) for item in limitations[:2]))
+            parts.append(
+                "**A useful boundary**\n" + " ".join(str(item) for item in limitations[:2])
+            )
     return "\n\n".join(parts)
-
-
 
 
 def _format_ratio_bps(value: Any) -> str:
@@ -253,9 +278,14 @@ def render_financial_health_explanation(data: dict[str, Any], customer_text: str
         ][:3]
     if "FINANCIAL_HEALTH_BADGE" not in topic_ids:
         topic_ids.insert(0, "FINANCIAL_HEALTH_BADGE")
-    education = academy_catalogue_explanation(
-        customer_text, topic_ids=topic_ids, require_customer_explanation=False,
-    ) or "The ORAIflow Financial Health badge is an educational view of recorded leverage, not a credit score."
+    education = (
+        academy_catalogue_explanation(
+            customer_text,
+            topic_ids=topic_ids,
+            require_customer_explanation=False,
+        )
+        or "The ORAIflow Financial Health badge is an educational view of recorded leverage, not a credit score."
+    )
 
     positions = data.get("positions") if isinstance(data, dict) else None
     snapshot_lines: list[str] = []
@@ -384,8 +414,7 @@ def render_loan_schedule_explanation(data: dict[str, Any]) -> str:
         schedule = (
             "\n\n**First illustrative instalments**\n\n"
             "| # | Illustrative date | Payment | Principal repaid | Interest |\n"
-            "|---:|---|---:|---:|---:|\n"
-            + "\n".join(sample_rows)
+            "|---:|---|---:|---:|---:|\n" + "\n".join(sample_rows)
         )
 
     term_text = f"{term} months" if term else "term not provided"
@@ -418,9 +447,11 @@ def render_loan_schedule_explanation(data: dict[str, Any]) -> str:
     )
     if data.get("demo_only") is not True or data.get("payment_tracking") != "NOT_TRACKED":
         tracking = "The retrieved schedule is presented as provided by the loan record; check the Loans workspace for its stated tracking status."
-    return "\n\n".join((
-        loan_summary + schedule,
-        concepts,
-        rate_caveat,
-        tracking,
-    ))
+    return "\n\n".join(
+        (
+            loan_summary + schedule,
+            concepts,
+            rate_caveat,
+            tracking,
+        )
+    )

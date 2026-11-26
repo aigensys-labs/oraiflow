@@ -22,4 +22,6 @@ def test_profile_update_cannot_override_server_identity_claims():
     from services.api.main import ProfileUpdateRequest
 
     with pytest.raises(ValidationError):
-        ProfileUpdateRequest(display_name="Alex Morgan", subject="attacker", tenant_id="other-tenant")
+        ProfileUpdateRequest(
+            display_name="Alex Morgan", subject="attacker", tenant_id="other-tenant"
+        )

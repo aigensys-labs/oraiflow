@@ -1,4 +1,5 @@
 """Shared assistant capability catalogue used by API guidance and UI templates."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -10,7 +11,9 @@ def assistant_capability_catalogue() -> list[dict[str, Any]]:
     """Return stable, presentation-safe capability cards from the OCCF registry."""
     items = get_registry().get("application_policy", {}).get("assistant_capabilities", [])
     valid = [item for item in items if isinstance(item, dict) and item.get("capability_id")]
-    return sorted(valid, key=lambda item: (int(item.get("sort_order", 0)), str(item.get("capability_id"))))
+    return sorted(
+        valid, key=lambda item: (int(item.get("sort_order", 0)), str(item.get("capability_id")))
+    )
 
 
 def assistant_capability_catalogue_message() -> str:

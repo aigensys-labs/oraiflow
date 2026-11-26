@@ -4,7 +4,6 @@ from types import SimpleNamespace
 from services.agent_runtime.frontend_receipts import transfer_draft_receipt_message
 from shared.contracts.registry import create_result_envelope
 
-
 WORKFLOW_ID = "workflow-12345678"
 ACTION_ID = "action-12345678"
 ACTION_ARGS = {
@@ -18,7 +17,9 @@ ACTION_ARGS = {
 }
 
 
-def _messages(*, receipt_action_id=ACTION_ID, outcome="SUCCESS", status="draft_opened", tool_call_id=ACTION_ID):
+def _messages(
+    *, receipt_action_id=ACTION_ID, outcome="SUCCESS", status="draft_opened", tool_call_id=ACTION_ID
+):
     call = {
         "name": "prepare_transfer_draft",
         "args": dict(ACTION_ARGS),
@@ -31,7 +32,11 @@ def _messages(*, receipt_action_id=ACTION_ID, outcome="SUCCESS", status="draft_o
         "frontend.transfer.prepare_draft",
         outcome,
         data=data if outcome == "SUCCESS" else None,
-        error={"code": "ACTION_REJECTED", "message": "Draft could not be opened"} if outcome != "SUCCESS" else None,
+        error=(
+            {"code": "ACTION_REJECTED", "message": "Draft could not be opened"}
+            if outcome != "SUCCESS"
+            else None
+        ),
     )
     tool = SimpleNamespace(
         type="tool",
@@ -49,7 +54,9 @@ def test_successful_browser_receipt_produces_precise_editable_draft_acknowledgem
     )
     assert result is not None
     message, receipt = result
-    assert "editable transfer draft for 1 EUR to John Carter from Everyday account is open" in message
+    assert (
+        "editable transfer draft for 1 EUR to John Carter from Everyday account is open" in message
+    )
     assert "Nothing has been previewed, approved or submitted" in message
     assert receipt["status"] == "draft_opened"
     assert receipt["workflow_id"] == WORKFLOW_ID
@@ -84,9 +91,12 @@ def test_rejected_browser_action_never_claims_draft_opened():
 
 
 def test_no_tool_receipt_returns_none_and_does_not_invent_an_acknowledgement():
-    assert transfer_draft_receipt_message([
-        SimpleNamespace(type="ai", content="Your draft is ready", tool_calls=[])
-    ]) is None
+    assert (
+        transfer_draft_receipt_message(
+            [SimpleNamespace(type="ai", content="Your draft is ready", tool_calls=[])]
+        )
+        is None
+    )
 
 
 def test_receipt_without_tool_call_id_never_matches_an_arbitrary_draft_action():

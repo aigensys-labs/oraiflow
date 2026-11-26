@@ -4,6 +4,7 @@ A turn outcome is derived from validated capability result envelopes emitted
 since the latest customer message. It records execution facts; it is not an
 LLM assertion, authorization decision, or replacement for OCCF validation.
 """
+
 from __future__ import annotations
 
 import json
@@ -15,8 +16,12 @@ from shared.task_contract import TurnTaskOutcome
 from shared.pending_task import message_metadata, message_type, message_value
 
 from shared.contracts.registry import (
-    ContractViolation, capability_by_name, get_capability, get_registry,
-    validate_result_envelope, validate_schema,
+    ContractViolation,
+    capability_by_name,
+    get_capability,
+    get_registry,
+    validate_result_envelope,
+    validate_schema,
 )
 
 
@@ -66,7 +71,7 @@ def _derive_task_outcomes(items: list[Any], start: int) -> tuple[TurnTaskOutcome
     task_specs: dict[str, dict[str, Any]] = {}
     result_messages: dict[str, list[Any]] = {}
     call_to_tasks: dict[str, list[str]] = {}
-    for message in items[start + 1:]:
+    for message in items[start + 1 :]:
         metadata = message_metadata(message)
         if _message_type(message) == "ai":
             plan = metadata.get("oraiflow_task_plan")
@@ -106,19 +111,30 @@ def _derive_task_outcomes(items: list[Any], start: int) -> tuple[TurnTaskOutcome
             statuses: list[str] = []
             for message in results:
                 tool_name = str(message_value(message, "name", "") or "")
-                registered = capability_by_name(tool_name, kind="mcp") or capability_by_name(tool_name, kind="frontend")
+                registered = capability_by_name(tool_name, kind="mcp") or capability_by_name(
+                    tool_name, kind="frontend"
+                )
                 if not registered:
                     # Presentation renderers are registered application
                     # resources, not banking capabilities. A correlated
                     # ToolMessage is their explicit browser receipt.
-                    presentation = next((
-                        (presentation_id, item)
-                        for presentation_id, item in get_registry().get("presentations", {}).items()
-                        if str(item.get("name", "")) == tool_name
-                    ), None)
+                    presentation = next(
+                        (
+                            (presentation_id, item)
+                            for presentation_id, item in get_registry()
+                            .get("presentations", {})
+                            .items()
+                            if str(item.get("name", "")) == tool_name
+                        ),
+                        None,
+                    )
                     if presentation is not None:
                         raw_content = _message_content(message)
-                        if isinstance(raw_content, str) and raw_content.strip().casefold() in {"error", "failed", "rejected"}:
+                        if isinstance(raw_content, str) and raw_content.strip().casefold() in {
+                            "error",
+                            "failed",
+                            "rejected",
+                        }:
                             statuses.append("FAILED")
                         else:
                             statuses.append("SUCCEEDED")
@@ -140,9 +156,21 @@ def _derive_task_outcomes(items: list[Any], start: int) -> tuple[TurnTaskOutcome
                     trace_ids.append(trace)
                 outcome = str(validated.get("outcome", ""))
                 if outcome == "SUCCESS":
-                    expected_status = get_capability(capability_id).get("result_semantics", {}).get("success_status")
-                    actual_status = (validated.get("data") or {}).get("status") if isinstance(validated.get("data"), dict) else None
-                    statuses.append("SUCCEEDED" if not expected_status or actual_status == expected_status else "FAILED")
+                    expected_status = (
+                        get_capability(capability_id)
+                        .get("result_semantics", {})
+                        .get("success_status")
+                    )
+                    actual_status = (
+                        (validated.get("data") or {}).get("status")
+                        if isinstance(validated.get("data"), dict)
+                        else None
+                    )
+                    statuses.append(
+                        "SUCCEEDED"
+                        if not expected_status or actual_status == expected_status
+                        else "FAILED"
+                    )
                 elif outcome == "PARTIAL":
                     statuses.append("PARTIAL")
                 elif outcome == "EMPTY":
@@ -158,30 +186,50 @@ def _derive_task_outcomes(items: list[Any], start: int) -> tuple[TurnTaskOutcome
             if statuses and all(value == "SUCCEEDED" for value in statuses):
                 status = "SUCCEEDED"
             elif "FAILED" in statuses:
-                status = "FAILED" if not any(value == "SUCCEEDED" for value in statuses) else "PARTIAL"
+                status = (
+                    "FAILED" if not any(value == "SUCCEEDED" for value in statuses) else "PARTIAL"
+                )
             elif "UNAVAILABLE" in statuses:
                 status = "UNAVAILABLE"
             elif "PARTIAL" in statuses:
                 status = "PARTIAL"
             elif "EMPTY" in statuses:
                 status = "EMPTY"
-        outcomes.append(TurnTaskOutcome(
-            task_id=task_id,
-            intent_id=intent_id,
-            status=status if status in {
-                "PLANNED", "SUCCEEDED", "PARTIAL", "EMPTY", "CLARIFICATION_REQUIRED",
-                "REJECTED", "FAILED", "UNAVAILABLE", "NOT_EXECUTED",
-            } else "FAILED",
-            capability_ids=capability_ids,
-            result_references=tuple(value for value in result_refs if value),
-            trace_ids=tuple(sorted(set(trace_ids))),
-            missing_fields=tuple(str(value) for value in spec.get("missing_fields", []) if value),
-            reason_code=str(reason_code) if reason_code else None,
-        ))
+        outcomes.append(
+            TurnTaskOutcome(
+                task_id=task_id,
+                intent_id=intent_id,
+                status=(
+                    status
+                    if status
+                    in {
+                        "PLANNED",
+                        "SUCCEEDED",
+                        "PARTIAL",
+                        "EMPTY",
+                        "CLARIFICATION_REQUIRED",
+                        "REJECTED",
+                        "FAILED",
+                        "UNAVAILABLE",
+                        "NOT_EXECUTED",
+                    }
+                    else "FAILED"
+                ),
+                capability_ids=capability_ids,
+                result_references=tuple(value for value in result_refs if value),
+                trace_ids=tuple(sorted(set(trace_ids))),
+                missing_fields=tuple(
+                    str(value) for value in spec.get("missing_fields", []) if value
+                ),
+                reason_code=str(reason_code) if reason_code else None,
+            )
+        )
     return tuple(outcomes)
 
 
-def derive_turn_outcome(messages: list[Any] | tuple[Any, ...], *, fallback_turn_id: str) -> TurnOutcome:
+def derive_turn_outcome(
+    messages: list[Any] | tuple[Any, ...], *, fallback_turn_id: str
+) -> TurnOutcome:
     """Derive an immutable outcome from current-turn, registry-validated results.
 
     Only ToolMessages after the latest HumanMessage are considered. MCP
@@ -204,7 +252,7 @@ def derive_turn_outcome(messages: list[Any] | tuple[Any, ...], *, fallback_turn_
     frontend_failed: set[str] = set()
     trace_ids: set[str] = set()
 
-    for message in items[start + 1:]:
+    for message in items[start + 1 :]:
         if _message_type(message) != "tool":
             continue
         tool_name = str(message_value(message, "name", "") or "")
@@ -243,7 +291,9 @@ def derive_turn_outcome(messages: list[Any] | tuple[Any, ...], *, fallback_turn_
                 continue
             trace_ids.add(str(validated.get("trace_id", "")))
             if validated.get("outcome") == "SUCCESS":
-                expected_status = get_capability(capability_id).get("result_semantics", {}).get("success_status")
+                expected_status = (
+                    get_capability(capability_id).get("result_semantics", {}).get("success_status")
+                )
                 actual_status = (validated.get("data") or {}).get("status")
                 if expected_status and actual_status == expected_status:
                     frontend_success.add(capability_id)
@@ -291,5 +341,10 @@ def derive_turn_outcome(messages: list[Any] | tuple[Any, ...], *, fallback_turn_
     )
     # The versioned turn-outcome schema in OCCF is the wire-contract source of
     # truth; the Pydantic model supplies the typed Python representation.
-    validate_schema("turn_outcome", "schema", get_registry()["turn_outcome_schema"], outcome_contract.model_dump(mode="json"))
+    validate_schema(
+        "turn_outcome",
+        "schema",
+        get_registry()["turn_outcome_schema"],
+        outcome_contract.model_dump(mode="json"),
+    )
     return outcome_contract

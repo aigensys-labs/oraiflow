@@ -1,4 +1,5 @@
 """Narrow institution-facing ports used by the Banking Kernel execution path."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

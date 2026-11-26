@@ -30,17 +30,13 @@ def test_explanatory_navigation_and_payment_exception_requests_are_not_misclassi
         "How much have I spent this month?",
     ]
 
-    assert [classify_canonical_read_intent(text) for text in requests] == [
-        None
-    ] * len(requests)
+    assert [classify_canonical_read_intent(text) for text in requests] == [None] * len(requests)
 
 
 def test_canonical_intent_classification_is_repeatable():
     query = "What are my recent transactions?"
 
-    assert {classify_canonical_read_intent(query) for _ in range(100)} == {
-        "RECENT_TRANSACTIONS"
-    }
+    assert {classify_canonical_read_intent(query) for _ in range(100)} == {"RECENT_TRANSACTIONS"}
 
 
 def test_empty_and_non_text_inputs_are_not_classified():
@@ -74,7 +70,9 @@ def test_singular_latest_transaction_requests_use_detail_intent_not_recent_list(
         "Tell me about my latest transaction",
         "Details for my last transaction",
     ]
-    assert [classify_canonical_read_intent(text) for text in requests] == ["LATEST_TRANSACTION_DETAIL"] * len(requests)
+    assert [classify_canonical_read_intent(text) for text in requests] == [
+        "LATEST_TRANSACTION_DETAIL"
+    ] * len(requests)
     assert classify_canonical_read_intent("What are my last transactions?") == "RECENT_TRANSACTIONS"
 
 

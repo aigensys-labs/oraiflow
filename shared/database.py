@@ -12,7 +12,8 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 
 from shared.demo_seed import (
-    parse_demo_salary_amount_minor, demo_salary_balance_delta,
+    parse_demo_salary_amount_minor,
+    demo_salary_balance_delta,
     build_demo_transaction_history,
 )
 from shared.loan_demo import build_demo_loan_record
@@ -59,7 +60,9 @@ def _backfill_audit_hashes(conn) -> None:
         if isinstance(detail, str):
             detail = json.loads(detail)
         occurred_at = row["occurred_at"]
-        occurred_text = occurred_at.isoformat() if isinstance(occurred_at, datetime) else str(occurred_at)
+        occurred_text = (
+            occurred_at.isoformat() if isinstance(occurred_at, datetime) else str(occurred_at)
+        )
         payload = {
             "event_id": int(row["event_id"]),
             "actor_id": row["actor_id"],
@@ -70,22 +73,30 @@ def _backfill_audit_hashes(conn) -> None:
             "occurred_at": occurred_text,
             "previous_hash": previous_hash,
         }
-        canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False, default=str)
+        canonical = json.dumps(
+            payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False, default=str
+        )
         event_hash = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
-        conn.execute(text("""
+        conn.execute(
+            text("""
             UPDATE audit_events
                SET previous_hash=:previous_hash, event_hash=:event_hash
              WHERE event_id=:event_id
-        """), {"previous_hash": previous_hash, "event_hash": event_hash, "event_id": row["event_id"]})
+        """),
+            {"previous_hash": previous_hash, "event_hash": event_hash, "event_id": row["event_id"]},
+        )
         previous_by_tenant[tenant] = event_hash
         head_id_by_tenant[tenant] = row["event_id"]
     for tenant, head_hash in previous_by_tenant.items():
-        conn.execute(text("""
+        conn.execute(
+            text("""
             INSERT INTO audit_chain_state(tenant_id, head_event_id, head_hash)
             VALUES (:tenant, :head_id, :head_hash)
             ON CONFLICT (tenant_id) DO UPDATE
               SET head_event_id=EXCLUDED.head_event_id, head_hash=EXCLUDED.head_hash
-        """), {"tenant": tenant, "head_id": head_id_by_tenant.get(tenant), "head_hash": head_hash})
+        """),
+            {"tenant": tenant, "head_id": head_id_by_tenant.get(tenant), "head_hash": head_hash},
+        )
 
 
 def _build_mcp_role_ddl(conn, password: str, role_exists: bool) -> str:
@@ -98,13 +109,14 @@ def _build_mcp_role_ddl(conn, password: str, role_exists: bool) -> str:
     template = (
         "ALTER ROLE oraiflow_mcp_reader WITH LOGIN NOINHERIT NOSUPERUSER "
         "NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS CONNECTION LIMIT 5 PASSWORD %L"
-        if role_exists else
-        "CREATE ROLE oraiflow_mcp_reader LOGIN NOINHERIT NOSUPERUSER "
+        if role_exists
+        else "CREATE ROLE oraiflow_mcp_reader LOGIN NOINHERIT NOSUPERUSER "
         "NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS CONNECTION LIMIT 5 PASSWORD %L"
     )
-    return conn.execute(text(
-        "SELECT format(CAST(:template AS text), CAST(:password AS text))"
-    ), {"template": template, "password": password}).scalar_one()
+    return conn.execute(
+        text("SELECT format(CAST(:template AS text), CAST(:password AS text))"),
+        {"template": template, "password": password},
+    ).scalar_one()
 
 
 def _build_checkpoint_role_ddl(conn, password: str, role_exists: bool) -> str:
@@ -112,13 +124,14 @@ def _build_checkpoint_role_ddl(conn, password: str, role_exists: bool) -> str:
     template = (
         "ALTER ROLE oraiflow_agent_checkpoint WITH LOGIN NOINHERIT NOSUPERUSER "
         "NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS CONNECTION LIMIT 5 PASSWORD %L"
-        if role_exists else
-        "CREATE ROLE oraiflow_agent_checkpoint LOGIN NOINHERIT NOSUPERUSER "
+        if role_exists
+        else "CREATE ROLE oraiflow_agent_checkpoint LOGIN NOINHERIT NOSUPERUSER "
         "NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS CONNECTION LIMIT 5 PASSWORD %L"
     )
-    return conn.execute(text(
-        "SELECT format(CAST(:template AS text), CAST(:password AS text))"
-    ), {"template": template, "password": password}).scalar_one()
+    return conn.execute(
+        text("SELECT format(CAST(:template AS text), CAST(:password AS text))"),
+        {"template": template, "password": password},
+    ).scalar_one()
 
 
 def ensure_runtime_schema() -> None:
@@ -128,13 +141,18 @@ def ensure_runtime_schema() -> None:
         # MCP is a read capability boundary: give it a distinct database role
         # restricted to the two synthetic read models used by its tools.
         mcp_password = os.getenv("MCP_DATABASE_PASSWORD", "local-only-read-change-me")
-        role_exists = conn.execute(text("SELECT 1 FROM pg_roles WHERE rolname='oraiflow_mcp_reader'")).first() is not None
+        role_exists = (
+            conn.execute(text("SELECT 1 FROM pg_roles WHERE rolname='oraiflow_mcp_reader'")).first()
+            is not None
+        )
         role_ddl = _build_mcp_role_ddl(conn, mcp_password, role_exists)
         conn.exec_driver_sql(role_ddl)
         conn.execute(text("REVOKE ALL PRIVILEGES ON SCHEMA public FROM oraiflow_mcp_reader"))
         conn.execute(text("REVOKE CREATE ON SCHEMA public FROM PUBLIC"))
         conn.execute(text("GRANT USAGE ON SCHEMA public TO oraiflow_mcp_reader"))
-        conn.execute(text("REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM oraiflow_mcp_reader"))
+        conn.execute(
+            text("REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM oraiflow_mcp_reader")
+        )
         conn.execute(text("""
             CREATE TABLE IF NOT EXISTS contacts (
                 contact_id TEXT PRIMARY KEY,
@@ -152,7 +170,11 @@ def ensure_runtime_schema() -> None:
                 UNIQUE(owner_id, tenant_id, contact_id)
             )
         """))
-        conn.execute(text("CREATE INDEX IF NOT EXISTS idx_contacts_owner_name ON contacts(owner_id, tenant_id, normalized_name)"))
+        conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS idx_contacts_owner_name ON contacts(owner_id, tenant_id, normalized_name)"
+            )
+        )
         conn.execute(text("""
             CREATE TABLE IF NOT EXISTS demo_loans (
                 loan_id TEXT PRIMARY KEY,
@@ -188,40 +210,91 @@ def ensure_runtime_schema() -> None:
                 PRIMARY KEY(loan_id, installment_number)
             )
         """))
-        conn.execute(text("CREATE INDEX IF NOT EXISTS idx_demo_loans_owner ON demo_loans(owner_id, tenant_id)"))
-        conn.execute(text("CREATE INDEX IF NOT EXISTS idx_demo_loan_due ON demo_loan_installments(loan_id, due_date)"))
-        conn.execute(text("GRANT SELECT ON TABLE accounts, transactions, contacts, demo_loans, demo_loan_installments TO oraiflow_mcp_reader"))
-        database_grant = conn.execute(text(
-            "SELECT format('GRANT CONNECT ON DATABASE %I TO oraiflow_mcp_reader', current_database())"
-        )).scalar_one()
+        conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS idx_demo_loans_owner ON demo_loans(owner_id, tenant_id)"
+            )
+        )
+        conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS idx_demo_loan_due ON demo_loan_installments(loan_id, due_date)"
+            )
+        )
+        conn.execute(
+            text(
+                "GRANT SELECT ON TABLE accounts, transactions, contacts, demo_loans, demo_loan_installments TO oraiflow_mcp_reader"
+            )
+        )
+        database_grant = conn.execute(
+            text(
+                "SELECT format('GRANT CONNECT ON DATABASE %I TO oraiflow_mcp_reader', current_database())"
+            )
+        ).scalar_one()
         conn.exec_driver_sql(database_grant)
 
         # LangGraph checkpoint persistence is isolated from the banking tables.
         # The Agent Runtime receives this schema-scoped principal, never the
         # Banking Core DATABASE_URL or the MCP read principal.
-        checkpoint_password = os.getenv("AGENT_CHECKPOINT_PASSWORD", "local-agent-checkpoint-change-me")
-        checkpoint_role_exists = conn.execute(text(
-            "SELECT 1 FROM pg_roles WHERE rolname='oraiflow_agent_checkpoint'"
-        )).first() is not None
-        checkpoint_role_ddl = _build_checkpoint_role_ddl(conn, checkpoint_password, checkpoint_role_exists)
+        checkpoint_password = os.getenv(
+            "AGENT_CHECKPOINT_PASSWORD", "local-agent-checkpoint-change-me"
+        )
+        checkpoint_role_exists = (
+            conn.execute(
+                text("SELECT 1 FROM pg_roles WHERE rolname='oraiflow_agent_checkpoint'")
+            ).first()
+            is not None
+        )
+        checkpoint_role_ddl = _build_checkpoint_role_ddl(
+            conn, checkpoint_password, checkpoint_role_exists
+        )
         conn.exec_driver_sql(checkpoint_role_ddl)
         conn.execute(text("CREATE SCHEMA IF NOT EXISTS oraiflow_agent AUTHORIZATION CURRENT_USER"))
         conn.execute(text("REVOKE ALL ON SCHEMA oraiflow_agent FROM PUBLIC"))
         conn.execute(text("REVOKE ALL PRIVILEGES ON SCHEMA public FROM oraiflow_agent_checkpoint"))
-        conn.execute(text("REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM oraiflow_agent_checkpoint"))
-        conn.execute(text("REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM oraiflow_agent_checkpoint"))
-        conn.execute(text("GRANT USAGE, CREATE ON SCHEMA oraiflow_agent TO oraiflow_agent_checkpoint"))
-        checkpoint_database_grant = conn.execute(text(
-            "SELECT format('GRANT CONNECT ON DATABASE %I TO oraiflow_agent_checkpoint', current_database())"
-        )).scalar_one()
+        conn.execute(
+            text(
+                "REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM oraiflow_agent_checkpoint"
+            )
+        )
+        conn.execute(
+            text(
+                "REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM oraiflow_agent_checkpoint"
+            )
+        )
+        conn.execute(
+            text("GRANT USAGE, CREATE ON SCHEMA oraiflow_agent TO oraiflow_agent_checkpoint")
+        )
+        checkpoint_database_grant = conn.execute(
+            text(
+                "SELECT format('GRANT CONNECT ON DATABASE %I TO oraiflow_agent_checkpoint', current_database())"
+            )
+        ).scalar_one()
         conn.exec_driver_sql(checkpoint_database_grant)
-        conn.execute(text("ALTER TABLE accounts ADD COLUMN IF NOT EXISTS tenant_id TEXT NOT NULL DEFAULT 'tenant-demo'"))
-        conn.execute(text("ALTER TABLE transfer_commands ADD COLUMN IF NOT EXISTS tenant_id TEXT NOT NULL DEFAULT 'tenant-demo'"))
+        conn.execute(
+            text(
+                "ALTER TABLE accounts ADD COLUMN IF NOT EXISTS tenant_id TEXT NOT NULL DEFAULT 'tenant-demo'"
+            )
+        )
+        conn.execute(
+            text(
+                "ALTER TABLE transfer_commands ADD COLUMN IF NOT EXISTS tenant_id TEXT NOT NULL DEFAULT 'tenant-demo'"
+            )
+        )
         conn.execute(text("ALTER TABLE transfer_commands ADD COLUMN IF NOT EXISTS preview_id TEXT"))
-        conn.execute(text("ALTER TABLE transfer_commands ADD COLUMN IF NOT EXISTS preview_digest TEXT"))
-        conn.execute(text("ALTER TABLE transfer_commands ADD COLUMN IF NOT EXISTS approval_id TEXT"))
-        conn.execute(text("ALTER TABLE transfer_commands ADD COLUMN IF NOT EXISTS outbox_event_id BIGINT"))
-        conn.execute(text("ALTER TABLE transfer_commands ADD COLUMN IF NOT EXISTS beneficiary_contact_id TEXT"))
+        conn.execute(
+            text("ALTER TABLE transfer_commands ADD COLUMN IF NOT EXISTS preview_digest TEXT")
+        )
+        conn.execute(
+            text("ALTER TABLE transfer_commands ADD COLUMN IF NOT EXISTS approval_id TEXT")
+        )
+        conn.execute(
+            text("ALTER TABLE transfer_commands ADD COLUMN IF NOT EXISTS outbox_event_id BIGINT")
+        )
+        conn.execute(
+            text(
+                "ALTER TABLE transfer_commands ADD COLUMN IF NOT EXISTS beneficiary_contact_id TEXT"
+            )
+        )
         conn.execute(text("ALTER TABLE audit_events ADD COLUMN IF NOT EXISTS tenant_id TEXT"))
         conn.execute(text("ALTER TABLE audit_events ADD COLUMN IF NOT EXISTS previous_hash TEXT"))
         conn.execute(text("ALTER TABLE audit_events ADD COLUMN IF NOT EXISTS event_hash TEXT"))
@@ -247,8 +320,16 @@ def ensure_runtime_schema() -> None:
                 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
             )
         """))
-        conn.execute(text("ALTER TABLE transfer_previews ADD COLUMN IF NOT EXISTS beneficiary_contact_id TEXT"))
-        conn.execute(text("CREATE INDEX IF NOT EXISTS idx_transfer_previews_owner ON transfer_previews(user_id, tenant_id, created_at DESC)"))
+        conn.execute(
+            text(
+                "ALTER TABLE transfer_previews ADD COLUMN IF NOT EXISTS beneficiary_contact_id TEXT"
+            )
+        )
+        conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS idx_transfer_previews_owner ON transfer_previews(user_id, tenant_id, created_at DESC)"
+            )
+        )
         conn.execute(text("""
             CREATE TABLE IF NOT EXISTS transfer_approvals (
                 approval_id TEXT PRIMARY KEY,
@@ -299,38 +380,51 @@ def ensure_runtime_schema() -> None:
         demo_user = os.getenv("DEMO_USER_ID", "user-001")
         demo_tenant = os.getenv("DEMO_TENANT_ID", "tenant-demo")
         demo_name = os.getenv("DEMO_DISPLAY_NAME", "Alex Morgan").strip() or "Demo Customer"
-        conn.execute(text("""
+        conn.execute(
+            text("""
             INSERT INTO customer_profiles(user_id, tenant_id, display_name)
             VALUES (:user, :tenant, :name)
             ON CONFLICT (user_id, tenant_id) DO NOTHING
-        """), {"user": demo_user, "tenant": demo_tenant, "name": demo_name})
+        """),
+            {"user": demo_user, "tenant": demo_tenant, "name": demo_name},
+        )
 
         # A demo-only loan is deliberately stored outside the deposit accounts
         # table: it is a liability and can never be treated as spendable funds or
         # as a transfer source. Its dates/status are illustrative, not tracked.
-        existing_loan = conn.execute(text("""
+        existing_loan = conn.execute(
+            text("""
             SELECT loan_id FROM demo_loans
              WHERE owner_id=:owner AND tenant_id=:tenant
              ORDER BY created_at LIMIT 1
-        """), {"owner": demo_user, "tenant": demo_tenant}).first()
+        """),
+            {"owner": demo_user, "tenant": demo_tenant},
+        ).first()
         if demo_loan_enabled() and not existing_loan:
-            scoped_loan_id = "loan-demo-" + hashlib.sha256(
-                f"{demo_user}|{demo_tenant}|illustrative-personal-loan".encode()
-            ).hexdigest()[:20]
+            scoped_loan_id = (
+                "loan-demo-"
+                + hashlib.sha256(
+                    f"{demo_user}|{demo_tenant}|illustrative-personal-loan".encode()
+                ).hexdigest()[:20]
+            )
             try:
                 principal_minor = int(os.getenv("DEMO_LOAN_PRINCIPAL_MINOR", "500000"))
                 apr_bps = int(os.getenv("DEMO_LOAN_APR_BPS", "690"))
                 term_months = int(os.getenv("DEMO_LOAN_TERM_MONTHS", "24"))
                 loan = build_demo_loan_record(
-                    loan_id=scoped_loan_id, principal_minor=principal_minor,
-                    apr_bps=apr_bps, term_months=term_months, disbursement_date=date.today(),
+                    loan_id=scoped_loan_id,
+                    principal_minor=principal_minor,
+                    apr_bps=apr_bps,
+                    term_months=term_months,
+                    disbursement_date=date.today(),
                 )
             except (TypeError, ValueError) as exc:
                 raise RuntimeError(f"Invalid illustrative loan configuration: {exc}") from exc
             loan_row = {key: value for key, value in loan.items() if key != "installments"}
             loan_row["disbursement_date"] = date.fromisoformat(loan["disbursement_date"])
             loan_row["first_due_date"] = date.fromisoformat(loan["first_due_date"])
-            conn.execute(text("""
+            conn.execute(
+                text("""
                 INSERT INTO demo_loans(loan_id, owner_id, tenant_id, product_name,
                     principal_minor, outstanding_principal_minor, currency,
                     annual_interest_rate_bps, term_months, monthly_payment_minor,
@@ -342,36 +436,118 @@ def ensure_runtime_schema() -> None:
                     :total_repayment_minor, :disbursement_date, :first_due_date,
                     'ILLUSTRATIVE', TRUE, 'NOT_TRACKED')
                 ON CONFLICT (loan_id) DO NOTHING
-            """), {**loan_row, "owner": demo_user, "tenant": demo_tenant})
+            """),
+                {**loan_row, "owner": demo_user, "tenant": demo_tenant},
+            )
             for installment in loan["installments"]:
-                conn.execute(text("""
+                conn.execute(
+                    text("""
                     INSERT INTO demo_loan_installments(loan_id, installment_number, due_date,
                         payment_minor, principal_minor, interest_minor, status)
                     VALUES (:loan_id, :installment_number, :due_date, :payment_minor,
                         :principal_minor, :interest_minor, 'ILLUSTRATIVE')
                     ON CONFLICT (loan_id, installment_number) DO NOTHING
-                """), {
-                    "loan_id": loan["loan_id"], **installment,
-                    "due_date": date.fromisoformat(installment["due_date"]),
-                })
+                """),
+                    {
+                        "loan_id": loan["loan_id"],
+                        **installment,
+                        "due_date": date.fromisoformat(installment["due_date"]),
+                    },
+                )
 
         # Seed ten synthetic payee contacts idempotently. These are local demo
         # records, not verified external beneficiaries or real bank accounts.
         demo_contacts = [
-            ("John Carter", "john.carter@example.test", "+420 601 000 101", "Northstar Bank", "DEMO ···· 1042", "EUR"),
-            ("John Mitchell", "john.mitchell@example.test", "+420 601 000 102", "Union Financial", "DEMO ···· 2781", "EUR"),
-            ("Anna Novak", "anna.novak@example.test", "+420 601 000 103", "Northstar Bank", "DEMO ···· 6409", "EUR"),
-            ("Anna Weber", "anna.weber@example.test", "+420 601 000 104", "Alpine Credit", "DEMO ···· 7715", "EUR"),
-            ("Michael Chen", "michael.chen@example.test", "+420 601 000 105", "Union Financial", "DEMO ···· 5238", "EUR"),
-            ("Sofia Rossi", "sofia.rossi@example.test", "+420 601 000 106", "Meridian Bank", "DEMO ···· 9914", "EUR"),
-            ("David Novak", "david.novak@example.test", "+420 601 000 107", "Northstar Bank", "DEMO ···· 1806", "EUR"),
-            ("Emma Wilson", "emma.wilson@example.test", "+420 601 000 108", "Alpine Credit", "DEMO ···· 3147", "EUR"),
-            ("Lucas Meyer", "lucas.meyer@example.test", "+420 601 000 109", "Meridian Bank", "DEMO ···· 8062", "EUR"),
-            ("Olivia Brown", "olivia.brown@example.test", "+420 601 000 110", "Union Financial", "DEMO ···· 4590", "EUR"),
+            (
+                "John Carter",
+                "john.carter@example.test",
+                "+420 601 000 101",
+                "Northstar Bank",
+                "DEMO ···· 1042",
+                "EUR",
+            ),
+            (
+                "John Mitchell",
+                "john.mitchell@example.test",
+                "+420 601 000 102",
+                "Union Financial",
+                "DEMO ···· 2781",
+                "EUR",
+            ),
+            (
+                "Anna Novak",
+                "anna.novak@example.test",
+                "+420 601 000 103",
+                "Northstar Bank",
+                "DEMO ···· 6409",
+                "EUR",
+            ),
+            (
+                "Anna Weber",
+                "anna.weber@example.test",
+                "+420 601 000 104",
+                "Alpine Credit",
+                "DEMO ···· 7715",
+                "EUR",
+            ),
+            (
+                "Michael Chen",
+                "michael.chen@example.test",
+                "+420 601 000 105",
+                "Union Financial",
+                "DEMO ···· 5238",
+                "EUR",
+            ),
+            (
+                "Sofia Rossi",
+                "sofia.rossi@example.test",
+                "+420 601 000 106",
+                "Meridian Bank",
+                "DEMO ···· 9914",
+                "EUR",
+            ),
+            (
+                "David Novak",
+                "david.novak@example.test",
+                "+420 601 000 107",
+                "Northstar Bank",
+                "DEMO ···· 1806",
+                "EUR",
+            ),
+            (
+                "Emma Wilson",
+                "emma.wilson@example.test",
+                "+420 601 000 108",
+                "Alpine Credit",
+                "DEMO ···· 3147",
+                "EUR",
+            ),
+            (
+                "Lucas Meyer",
+                "lucas.meyer@example.test",
+                "+420 601 000 109",
+                "Meridian Bank",
+                "DEMO ···· 8062",
+                "EUR",
+            ),
+            (
+                "Olivia Brown",
+                "olivia.brown@example.test",
+                "+420 601 000 110",
+                "Union Financial",
+                "DEMO ···· 4590",
+                "EUR",
+            ),
         ]
-        for index, (full_name, email, phone, bank_name, account_ref, currency) in enumerate(demo_contacts, start=1):
-            contact_id = "ct-" + hashlib.sha256(f"{demo_user}|{demo_tenant}|{index}".encode()).hexdigest()[:24]
-            conn.execute(text("""
+        for index, (full_name, email, phone, bank_name, account_ref, currency) in enumerate(
+            demo_contacts, start=1
+        ):
+            contact_id = (
+                "ct-"
+                + hashlib.sha256(f"{demo_user}|{demo_tenant}|{index}".encode()).hexdigest()[:24]
+            )
+            conn.execute(
+                text("""
                 INSERT INTO contacts(
                     contact_id, owner_id, tenant_id, full_name, normalized_name,
                     email, phone, bank_name, account_reference_masked, currency, status
@@ -379,12 +555,20 @@ def ensure_runtime_schema() -> None:
                     :contact_id, :owner, :tenant, :full_name, :normalized_name,
                     :email, :phone, :bank_name, :account_ref, :currency, 'ACTIVE'
                 ) ON CONFLICT (contact_id) DO NOTHING
-            """), {
-                "contact_id": contact_id, "owner": demo_user, "tenant": demo_tenant,
-                "full_name": full_name, "normalized_name": " ".join(full_name.casefold().split()),
-                "email": email, "phone": phone, "bank_name": bank_name,
-                "account_ref": account_ref, "currency": currency,
-            })
+            """),
+                {
+                    "contact_id": contact_id,
+                    "owner": demo_user,
+                    "tenant": demo_tenant,
+                    "full_name": full_name,
+                    "normalized_name": " ".join(full_name.casefold().split()),
+                    "email": email,
+                    "phone": phone,
+                    "bank_name": bank_name,
+                    "account_ref": account_ref,
+                    "currency": currency,
+                },
+            )
 
         # Update only the known synthetic salary seed row. The amount is a
         # demo-only monthly net-pay-style illustration, not a customer's real
@@ -393,7 +577,9 @@ def ensure_runtime_schema() -> None:
         # internally consistent. The amount comparison makes this idempotent.
         employer = os.getenv("DEMO_SALARY_EMPLOYER", "Northstar Labs").strip() or "Northstar Labs"
         try:
-            target_salary_minor = parse_demo_salary_amount_minor(os.getenv("DEMO_SALARY_AMOUNT_MINOR"))
+            target_salary_minor = parse_demo_salary_amount_minor(
+                os.getenv("DEMO_SALARY_AMOUNT_MINOR")
+            )
         except ValueError as exc:
             raise RuntimeError(str(exc)) from exc
         salary_row = conn.execute(text("""
@@ -402,40 +588,61 @@ def ensure_runtime_schema() -> None:
              WHERE transaction_id = 'txn-001'
              FOR UPDATE
         """)).mappings().first()
-        if (salary_row
-                and salary_row["category"] == "INCOME"
-                and str(salary_row["currency"]).strip() == "EUR"
-                and str(salary_row["description"] or "").startswith("Salary")):
-            account_row = conn.execute(text("""
+        if (
+            salary_row
+            and salary_row["category"] == "INCOME"
+            and str(salary_row["currency"]).strip() == "EUR"
+            and str(salary_row["description"] or "").startswith("Salary")
+        ):
+            account_row = conn.execute(
+                text("""
                 SELECT account_id
                   FROM accounts
                  WHERE account_id = :account_id AND owner_id = :owner_id
                  FOR UPDATE
-            """), {"account_id": salary_row["account_id"], "owner_id": demo_user}).first()
-            salary_delta = demo_salary_balance_delta(int(salary_row["amount_minor"]), target_salary_minor)
+            """),
+                {"account_id": salary_row["account_id"], "owner_id": demo_user},
+            ).first()
+            salary_delta = demo_salary_balance_delta(
+                int(salary_row["amount_minor"]), target_salary_minor
+            )
             if account_row and salary_delta != 0:
-                conn.execute(text("""
+                conn.execute(
+                    text("""
                     UPDATE accounts
                        SET balance_minor = balance_minor + :delta
                      WHERE account_id = :account_id AND owner_id = :owner_id
-                """), {"delta": salary_delta, "account_id": salary_row["account_id"], "owner_id": demo_user})
-                conn.execute(text("""
+                """),
+                    {
+                        "delta": salary_delta,
+                        "account_id": salary_row["account_id"],
+                        "owner_id": demo_user,
+                    },
+                )
+                conn.execute(
+                    text("""
                     UPDATE transactions
                        SET amount_minor = :target, description = 'Salary · ' || :employer
                      WHERE transaction_id = 'txn-001' AND amount_minor = :old_amount
                        AND category = 'INCOME' AND currency = 'EUR'
-                """), {
-                    "target": target_salary_minor, "employer": employer,
-                    "old_amount": int(salary_row["amount_minor"]),
-                })
+                """),
+                    {
+                        "target": target_salary_minor,
+                        "employer": employer,
+                        "old_amount": int(salary_row["amount_minor"]),
+                    },
+                )
             else:
-                conn.execute(text("""
+                conn.execute(
+                    text("""
                     UPDATE transactions
                        SET description = 'Salary · ' || :employer
                      WHERE transaction_id = 'txn-001' AND category = 'INCOME'
                        AND currency = 'EUR' AND description LIKE 'Salary%'
                        AND description <> 'Salary · ' || :employer
-                """), {"employer": employer})
+                """),
+                    {"employer": employer},
+                )
 
         # This opt-in, local-only fixture extends the sample analytics dataset.
         # Stable transaction IDs and ON CONFLICT DO NOTHING make the migration
@@ -450,12 +657,20 @@ def ensure_runtime_schema() -> None:
             )
             for row in history_rows:
                 insert_parameters = {
-                    key: row[key] for key in (
-                        "transaction_id", "account_id", "description", "category",
-                        "amount_minor", "currency", "status", "occurred_at",
+                    key: row[key]
+                    for key in (
+                        "transaction_id",
+                        "account_id",
+                        "description",
+                        "category",
+                        "amount_minor",
+                        "currency",
+                        "status",
+                        "occurred_at",
                     )
                 }
-                conn.execute(text("""
+                conn.execute(
+                    text("""
                     INSERT INTO transactions(
                         transaction_id, account_id, description, category,
                         amount_minor, currency, status, occurred_at
@@ -465,16 +680,28 @@ def ensure_runtime_schema() -> None:
                       FROM accounts a
                      WHERE a.account_id = :account_id AND a.owner_id = :owner_id
                     ON CONFLICT (transaction_id) DO NOTHING
-                """), {**insert_parameters, "owner_id": demo_user})
+                """),
+                    {**insert_parameters, "owner_id": demo_user},
+                )
 
         # Existing demo accounts inherit the configured local tenant. Do not
         # accept tenant identity from the browser or an LLM tool argument.
-        conn.execute(text("UPDATE accounts SET tenant_id=:tenant WHERE tenant_id IS NULL OR tenant_id='tenant-demo'"),
-                     {"tenant": os.getenv("DEMO_TENANT_ID", "tenant-demo")})
-        conn.execute(text("UPDATE transfer_commands SET tenant_id=:tenant WHERE tenant_id IS NULL OR tenant_id='tenant-demo'"),
-                     {"tenant": os.getenv("DEMO_TENANT_ID", "tenant-demo")})
-        conn.execute(text("UPDATE audit_events SET tenant_id=:tenant WHERE tenant_id IS NULL"),
-                     {"tenant": os.getenv("DEMO_TENANT_ID", "tenant-demo")})
+        conn.execute(
+            text(
+                "UPDATE accounts SET tenant_id=:tenant WHERE tenant_id IS NULL OR tenant_id='tenant-demo'"
+            ),
+            {"tenant": os.getenv("DEMO_TENANT_ID", "tenant-demo")},
+        )
+        conn.execute(
+            text(
+                "UPDATE transfer_commands SET tenant_id=:tenant WHERE tenant_id IS NULL OR tenant_id='tenant-demo'"
+            ),
+            {"tenant": os.getenv("DEMO_TENANT_ID", "tenant-demo")},
+        )
+        conn.execute(
+            text("UPDATE audit_events SET tenant_id=:tenant WHERE tenant_id IS NULL"),
+            {"tenant": os.getenv("DEMO_TENANT_ID", "tenant-demo")},
+        )
         _backfill_audit_hashes(conn)
 
         # Reject in-place changes to historical evidence. Hash chaining makes
@@ -564,12 +791,28 @@ def ensure_runtime_schema() -> None:
                 UNIQUE (event_type, aggregate_id)
             )
         """))
-        conn.execute(text("CREATE INDEX IF NOT EXISTS idx_transfer_outbox_pending ON transfer_outbox(status, created_at)"))
+        conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS idx_transfer_outbox_pending ON transfer_outbox(status, created_at)"
+            )
+        )
         # Enforce the one-preview → one-approval → one-command relationship at
         # the database boundary as well as in the API transaction.
-        conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS uq_transfer_commands_preview_id ON transfer_commands(preview_id) WHERE preview_id IS NOT NULL"))
-        conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS uq_transfer_commands_approval_id ON transfer_commands(approval_id) WHERE approval_id IS NOT NULL"))
-        conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS uq_transfer_commands_outbox_event_id ON transfer_commands(outbox_event_id) WHERE outbox_event_id IS NOT NULL"))
+        conn.execute(
+            text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS uq_transfer_commands_preview_id ON transfer_commands(preview_id) WHERE preview_id IS NOT NULL"
+            )
+        )
+        conn.execute(
+            text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS uq_transfer_commands_approval_id ON transfer_commands(approval_id) WHERE approval_id IS NOT NULL"
+            )
+        )
+        conn.execute(
+            text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS uq_transfer_commands_outbox_event_id ON transfer_commands(outbox_event_id) WHERE outbox_event_id IS NOT NULL"
+            )
+        )
         conn.execute(text("""
             DO $$ BEGIN
                 IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='fk_transfer_commands_preview') THEN

@@ -58,7 +58,9 @@ async def test_assessment_json_message_is_suppressed_as_a_whole():
     )
     chunks = [payload[:40], payload[40:95], payload[95:]]
     events = [event("TEXT_MESSAGE_START", message_id=message_id, role="assistant")]
-    events.extend(event("TEXT_MESSAGE_CONTENT", message_id=message_id, delta=part) for part in chunks)
+    events.extend(
+        event("TEXT_MESSAGE_CONTENT", message_id=message_id, delta=part) for part in chunks
+    )
     events.append(event("TEXT_MESSAGE_END", message_id=message_id, role="assistant"))
 
     assert await collect(async_events(events)) == []
@@ -83,7 +85,11 @@ async def test_plain_assistant_prose_is_forwarded_without_waiting_for_json_buffe
     message_id = "customer-message-1"
     events = [
         event("TEXT_MESSAGE_START", message_id=message_id, role="assistant"),
-        event("TEXT_MESSAGE_CONTENT", message_id=message_id, delta="Here are your recent transactions."),
+        event(
+            "TEXT_MESSAGE_CONTENT",
+            message_id=message_id,
+            delta="Here are your recent transactions.",
+        ),
         event("TEXT_MESSAGE_CONTENT", message_id=message_id, delta=" I found six records."),
         event("TEXT_MESSAGE_END", message_id=message_id, role="assistant"),
     ]
@@ -97,7 +103,9 @@ async def test_customer_json_without_internal_assessment_markers_is_preserved():
     message_id = "customer-json-1"
     events = [
         event("TEXT_MESSAGE_START", message_id=message_id, role="assistant"),
-        event("TEXT_MESSAGE_CONTENT", message_id=message_id, delta='{"total": 3, "currency": "EUR"}'),
+        event(
+            "TEXT_MESSAGE_CONTENT", message_id=message_id, delta='{"total": 3, "currency": "EUR"}'
+        ),
         event("TEXT_MESSAGE_END", message_id=message_id, role="assistant"),
     ]
 
@@ -109,7 +117,11 @@ async def test_non_assistant_json_message_is_not_filtered():
     message_id = "user-message-1"
     events = [
         event("TEXT_MESSAGE_START", message_id=message_id, role="user"),
-        event("TEXT_MESSAGE_CONTENT", message_id=message_id, delta='{"schema_version":"1.0.0","tasks":[]}'),
+        event(
+            "TEXT_MESSAGE_CONTENT",
+            message_id=message_id,
+            delta='{"schema_version":"1.0.0","tasks":[]}',
+        ),
         event("TEXT_MESSAGE_END", message_id=message_id, role="user"),
     ]
 

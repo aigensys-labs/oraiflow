@@ -14,5 +14,7 @@ def amount_minor(value: str) -> int:
     except (InvalidOperation, AttributeError):
         raise HTTPException(status_code=422, detail="Enter a valid transfer amount")
     if not amount.is_finite() or amount <= 0 or amount.as_tuple().exponent < -2:
-        raise HTTPException(status_code=422, detail="Amount must be positive with at most two decimal places")
+        raise HTTPException(
+            status_code=422, detail="Amount must be positive with at most two decimal places"
+        )
     return int(amount * 100)

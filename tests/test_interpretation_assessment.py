@@ -102,7 +102,10 @@ def test_enforced_low_entity_confidence_requests_clarification(monkeypatch):
     _, decision = validate_interpretation_assessment(
         payload,
         expected_capability_id="banking.transactions.recent",
-        sources={"current_turn": "Explain my last payment", "conversation": "Explain my last payment"},
+        sources={
+            "current_turn": "Explain my last payment",
+            "conversation": "Explain my last payment",
+        },
     )
     assert decision["decision"] == "CLARIFY"
     assert decision["dimensions"] == ["entity"]
@@ -122,18 +125,27 @@ def test_natural_language_comparative_preference_is_a_grounded_semantic_enum(mon
         "entities": {},
         "evidence": [
             {"field": "intent", "source": "current_turn", "quote": "with the highest amount"},
-            {"field": "source_account_preference", "source": "current_turn", "quote": "with the highest amount"},
+            {
+                "field": "source_account_preference",
+                "source": "current_turn",
+                "quote": "with the highest amount",
+            },
         ],
     }
     _, decision = validate_interpretation_assessment(
         payload,
         expected_capability_id="banking.accounts.list",
-        sources={"current_turn": "with the highest amount", "conversation": "send 70 to Lucas\nwith the highest amount"},
+        sources={
+            "current_turn": "with the highest amount",
+            "conversation": "send 70 to Lucas\nwith the highest amount",
+        },
     )
     assert decision["decision"] == "PASS"
 
 
-def test_contact_candidate_search_defers_entity_threshold_until_verified_candidates_exist(monkeypatch):
+def test_contact_candidate_search_defers_entity_threshold_until_verified_candidates_exist(
+    monkeypatch,
+):
     monkeypatch.setenv("ORAI_CONFIDENCE_GATE_MODE", "enforce")
     monkeypatch.setenv("ORAI_INTENT_CONFIDENCE_THRESHOLD", "0.8")
     monkeypatch.setenv("ORAI_SLOT_CONFIDENCE_THRESHOLD", "0.8")
@@ -197,16 +209,20 @@ def test_model_facing_mcp_tool_schema_uses_flat_assessment_transport():
     assert "interpretation_assessment" not in provider_schema.get("properties", {})
     # Local models commonly emit amount as a JSON number. The provider-facing
     # schema must accept it so the runtime can normalize it to a canonical str.
-    parsed = assessed.model_validate({
-        "limit": 10,
-        "name_query": "John",
-        "orai_intent_id": "TRANSFER_PREPARATION",
-        "orai_slots": {"amount": 50, "currency": "EUR"},
-    })
+    parsed = assessed.model_validate(
+        {
+            "limit": 10,
+            "name_query": "John",
+            "orai_intent_id": "TRANSFER_PREPARATION",
+            "orai_slots": {"amount": 50, "currency": "EUR"},
+        }
+    )
     assert parsed.orai_slots["amount"] == 50
     from services.agent_runtime.interpretation import assessment_from_tool_arguments
+
     canonical, _ = assessment_from_tool_arguments(
-        parsed.model_dump(), expected_capability_id="banking.contacts.search",
+        parsed.model_dump(),
+        expected_capability_id="banking.contacts.search",
         inferred_intent_id="TRANSFER_PREPARATION",
     )
     assert canonical["slots"]["amount"] == "50"
@@ -215,10 +231,12 @@ def test_model_facing_mcp_tool_schema_uses_flat_assessment_transport():
 def test_assessment_schema_defaults_empty_collections_without_inventing_scores():
     from services.agent_runtime.interpretation import InterpretationAssessment
 
-    assessment = InterpretationAssessment.model_validate({
-        "intent_id": "TRANSFER_PREPARATION",
-        "capability_id": "banking.contacts.search",
-    })
+    assessment = InterpretationAssessment.model_validate(
+        {
+            "intent_id": "TRANSFER_PREPARATION",
+            "capability_id": "banking.contacts.search",
+        }
+    )
     assert assessment.resolution == "READY"
     assert assessment.slots == {}
     assert assessment.entities == {}
@@ -243,7 +261,11 @@ def test_workspace_reference_can_be_resolved_from_prior_assistant_context(monkey
         "entities": {"workspace": "Controls & audit"},
         "evidence": [
             {"field": "intent", "source": "current_turn", "quote": "take me there"},
-            {"field": "workspace", "source": "assistant_context", "quote": "The audit view is in the Controls & audit workspace."},
+            {
+                "field": "workspace",
+                "source": "assistant_context",
+                "quote": "The audit view is in the Controls & audit workspace.",
+            },
         ],
     }
     assessment, decision = validate_interpretation_assessment(
@@ -304,14 +326,26 @@ def test_semantic_workspace_alias_must_resolve_to_a_unique_registered_page(monke
     _, decision = validate_interpretation_assessment(
         payload,
         expected_capability_id="frontend.workspace.navigate",
-        sources={"current_turn": "open audit", "conversation": "open audit", "assistant_context": "", "application_context": "{}", "capability_result": ""},
+        sources={
+            "current_turn": "open audit",
+            "conversation": "open audit",
+            "assistant_context": "",
+            "application_context": "{}",
+            "capability_result": "",
+        },
     )
     assert decision["decision"] == "PASS"
     payload["entities"]["workspace"] = "Admin console"
     _, invalid = validate_interpretation_assessment(
         payload,
         expected_capability_id="frontend.workspace.navigate",
-        sources={"current_turn": "open audit", "conversation": "open audit", "assistant_context": "", "application_context": "{}", "capability_result": ""},
+        sources={
+            "current_turn": "open audit",
+            "conversation": "open audit",
+            "assistant_context": "",
+            "application_context": "{}",
+            "capability_result": "",
+        },
     )
     assert invalid["code"] == "VALUE_EVIDENCE_MISSING"
 
@@ -335,11 +369,23 @@ def test_everyday_short_name_can_be_evidenced_against_account_catalogue(monkeypa
             {"field": "account_name", "source": "current_turn", "quote": "Everyday"},
         ],
     }
-    context = json.dumps({"accounts": [{"account_id": "acc-001", "account_name": "Everyday account", "currency": "EUR"}]})
+    context = json.dumps(
+        {
+            "accounts": [
+                {"account_id": "acc-001", "account_name": "Everyday account", "currency": "EUR"}
+            ]
+        }
+    )
     _, decision = validate_interpretation_assessment(
         payload,
         expected_capability_id="frontend.account.select",
-        sources={"current_turn": "select Everyday", "conversation": "select Everyday", "assistant_context": "", "application_context": context, "capability_result": ""},
+        sources={
+            "current_turn": "select Everyday",
+            "conversation": "select Everyday",
+            "assistant_context": "",
+            "application_context": context,
+            "capability_result": "",
+        },
     )
     assert decision["decision"] == "PASS"
 
@@ -364,20 +410,37 @@ def test_assessment_sources_separate_assistant_context_and_only_validated_tool_r
     result = create_result_envelope(
         "banking.transactions.recent",
         "SUCCESS",
-        data=[{
-            "transaction_id": "txn-001", "account_name": "Everyday account",
-            "description": "Salary · AIGENSYS", "category": "INCOME",
-            "amount_minor": 1100000, "currency": "EUR", "status": "BOOKED",
-            "occurred_at": "2026-11-21T22:18:00Z",
-        }],
-        evidence={"source": "mcp", "scope": "authenticated_customer_transactions", "completeness": "COMPLETE"},
+        data=[
+            {
+                "transaction_id": "txn-001",
+                "account_name": "Everyday account",
+                "description": "Salary · AIGENSYS",
+                "category": "INCOME",
+                "amount_minor": 1100000,
+                "currency": "EUR",
+                "status": "BOOKED",
+                "occurred_at": "2026-11-21T22:18:00Z",
+            }
+        ],
+        evidence={
+            "source": "mcp",
+            "scope": "authenticated_customer_transactions",
+            "completeness": "COMPLETE",
+        },
         trace_id="trace-test",
     )
     messages = [
         SimpleNamespace(type="human", content="where is audit?", name=None),
-        SimpleNamespace(type="ai", content="The audit view is in Controls & audit. I can take you there.", name=None, tool_calls=[]),
+        SimpleNamespace(
+            type="ai",
+            content="The audit view is in Controls & audit. I can take you there.",
+            name=None,
+            tool_calls=[],
+        ),
         SimpleNamespace(type="tool", content=json.dumps(result), name="get_recent_transactions"),
-        SimpleNamespace(type="tool", content="not a valid evidence envelope", name="get_recent_transactions"),
+        SimpleNamespace(
+            type="tool", content="not a valid evidence envelope", name="get_recent_transactions"
+        ),
     ]
     sources = assessment_sources(messages, "take me there", {"selected_account_id": None})
     assert "Controls & audit" in sources["assistant_context"]
@@ -386,7 +449,9 @@ def test_assessment_sources_separate_assistant_context_and_only_validated_tool_r
     assert "take me there" in sources["current_turn"]
 
 
-def test_transaction_selector_contract_rejects_an_older_item_not_supported_by_recent_read(monkeypatch):
+def test_transaction_selector_contract_rejects_an_older_item_not_supported_by_recent_read(
+    monkeypatch,
+):
     monkeypatch.setenv("ORAI_CONFIDENCE_GATE_MODE", "observe")
     payload = {
         "intent_id": "TRANSACTION_EXPLANATION",
@@ -401,7 +466,11 @@ def test_transaction_selector_contract_rejects_an_older_item_not_supported_by_re
         "evidence": [
             {"field": "intent", "source": "current_turn", "quote": "the last one"},
             {"field": "transaction_selector", "source": "current_turn", "quote": "the last one"},
-            {"field": "transaction_selector", "source": "capability_result", "quote": '"transaction_id":"txn-001"'},
+            {
+                "field": "transaction_selector",
+                "source": "capability_result",
+                "quote": '"transaction_id":"txn-001"',
+            },
         ],
     }
     _, decision = validate_interpretation_assessment(
@@ -439,7 +508,13 @@ def test_last_item_reference_without_verified_prior_result_is_not_grounded(monke
     _, decision = validate_interpretation_assessment(
         payload,
         expected_capability_id="banking.transactions.recent",
-        sources={"current_turn": "the last one", "conversation": "the last one", "assistant_context": "", "application_context": "{}", "capability_result": ""},
+        sources={
+            "current_turn": "the last one",
+            "conversation": "the last one",
+            "assistant_context": "",
+            "application_context": "{}",
+            "capability_result": "",
+        },
     )
     assert decision["code"] == "INTENT_SEMANTIC_VALUE_UNSUPPORTED"
 
@@ -457,14 +532,24 @@ def test_assistant_context_cannot_replace_customer_intent_evidence(monkeypatch):
         "slots": {},
         "entities": {"workspace": "Controls & audit"},
         "evidence": [
-            {"field": "intent", "source": "assistant_context", "quote": "I can take you to Controls & audit."},
+            {
+                "field": "intent",
+                "source": "assistant_context",
+                "quote": "I can take you to Controls & audit.",
+            },
             {"field": "workspace", "source": "assistant_context", "quote": "Controls & audit"},
         ],
     }
     _, decision = validate_interpretation_assessment(
         payload,
         expected_capability_id="frontend.workspace.navigate",
-        sources={"current_turn": "", "conversation": "", "assistant_context": "I can take you to Controls & audit.", "application_context": "{}", "capability_result": ""},
+        sources={
+            "current_turn": "",
+            "conversation": "",
+            "assistant_context": "I can take you to Controls & audit.",
+            "application_context": "{}",
+            "capability_result": "",
+        },
     )
     assert decision["code"] == "CUSTOMER_INSTRUCTION_EVIDENCE_MISSING"
 
@@ -483,18 +568,29 @@ def test_assistant_quote_must_exist_verbatim_in_assistant_context(monkeypatch):
         "entities": {"workspace": "Controls & audit"},
         "evidence": [
             {"field": "intent", "source": "current_turn", "quote": "take me there"},
-            {"field": "workspace", "source": "assistant_context", "quote": "The Risk Management workspace is open."},
+            {
+                "field": "workspace",
+                "source": "assistant_context",
+                "quote": "The Risk Management workspace is open.",
+            },
         ],
     }
     assessment, decision = validate_interpretation_assessment(
         payload,
         expected_capability_id="frontend.workspace.navigate",
-        sources={"current_turn": "take me there", "conversation": "take me there", "assistant_context": "The audit view is in Controls & audit.", "application_context": "{}", "capability_result": ""},
+        sources={
+            "current_turn": "take me there",
+            "conversation": "take me there",
+            "assistant_context": "The audit view is in Controls & audit.",
+            "application_context": "{}",
+            "capability_result": "",
+        },
     )
     assert decision["decision"] == "PASS"
     assert decision["evidence_anchor"]["model_evidence_rejected"] == 1
     assert assessment is not None and any(
-        item.field == "workspace" and item.source == "assistant_context"
+        item.field == "workspace"
+        and item.source == "assistant_context"
         and "Controls & audit" in item.quote
         for item in assessment.evidence
     )
@@ -525,11 +621,13 @@ def test_assistant_context_workspace_reference_requires_deictic_customer_turn(mo
     monkeypatch.setenv("ORAI_CONFIDENCE_GATE_MODE", "observe")
     payload = {
         "intent_id": "WORKSPACE_NAVIGATION",
-        "intent_confidence": 0.96, "slot_confidence": 0.91,
+        "intent_confidence": 0.96,
+        "slot_confidence": 0.91,
         "entity_confidence": 0.94,
         "capability_id": "frontend.workspace.navigate",
         "capability_selection_confidence": 0.95,
-        "resolution": "READY", "slots": {},
+        "resolution": "READY",
+        "slots": {},
         "entities": {"workspace": "Controls & audit"},
         "evidence": [
             {"field": "intent", "source": "current_turn", "quote": "open it"},
@@ -537,23 +635,28 @@ def test_assistant_context_workspace_reference_requires_deictic_customer_turn(mo
         ],
     }
     _, allowed = validate_interpretation_assessment(
-        payload, expected_capability_id="frontend.workspace.navigate",
+        payload,
+        expected_capability_id="frontend.workspace.navigate",
         sources={
-            "current_turn": "open it", "conversation": "show me audit\nopen it",
+            "current_turn": "open it",
+            "conversation": "show me audit\nopen it",
             "assistant_context": "The audit view is in Controls & audit.",
-            "application_context": "{}", "capability_result": "",
+            "application_context": "{}",
+            "capability_result": "",
         },
     )
     assert allowed["decision"] == "PASS"
 
     payload["evidence"][0]["quote"] = "what is the audit workspace?"
     _, denied = validate_interpretation_assessment(
-        payload, expected_capability_id="frontend.workspace.navigate",
+        payload,
+        expected_capability_id="frontend.workspace.navigate",
         sources={
             "current_turn": "what is the audit workspace?",
             "conversation": "what is the audit workspace?",
             "assistant_context": "The audit view is in Controls & audit.",
-            "application_context": "{}", "capability_result": "",
+            "application_context": "{}",
+            "capability_result": "",
         },
     )
     assert denied["code"] == "VALUE_EVIDENCE_MISSING"
@@ -562,26 +665,45 @@ def test_assistant_context_workspace_reference_requires_deictic_customer_turn(mo
 def test_semantic_balance_and_account_enums_require_meaningful_customer_language(monkeypatch):
     monkeypatch.setenv("ORAI_CONFIDENCE_GATE_MODE", "observe")
     payload = {
-        "intent_id": "ACCOUNT_TOTAL_BALANCE", "intent_confidence": 0.93,
-        "slot_confidence": 0.92, "entity_confidence": 0.95,
-        "capability_id": "banking.accounts.list", "capability_selection_confidence": 0.94,
-        "resolution": "READY", "slots": {"balance_scope": "total"}, "entities": {},
+        "intent_id": "ACCOUNT_TOTAL_BALANCE",
+        "intent_confidence": 0.93,
+        "slot_confidence": 0.92,
+        "entity_confidence": 0.95,
+        "capability_id": "banking.accounts.list",
+        "capability_selection_confidence": 0.94,
+        "resolution": "READY",
+        "slots": {"balance_scope": "total"},
+        "entities": {},
         "evidence": [
             {"field": "intent", "source": "current_turn", "quote": "what's my sum?"},
             {"field": "balance_scope", "source": "current_turn", "quote": "what's my sum?"},
         ],
     }
     _, good = validate_interpretation_assessment(
-        payload, expected_capability_id="banking.accounts.list",
-        sources={"current_turn": "what's my sum?", "conversation": "what's my sum?", "assistant_context": "", "application_context": "{}", "capability_result": ""},
+        payload,
+        expected_capability_id="banking.accounts.list",
+        sources={
+            "current_turn": "what's my sum?",
+            "conversation": "what's my sum?",
+            "assistant_context": "",
+            "application_context": "{}",
+            "capability_result": "",
+        },
     )
     assert good["decision"] == "PASS"
 
     payload["evidence"][0]["quote"] = "what's my remaining amount?"
     payload["evidence"][1]["quote"] = "what's my remaining amount?"
     _, ambiguous = validate_interpretation_assessment(
-        payload, expected_capability_id="banking.accounts.list",
-        sources={"current_turn": "what's my remaining amount?", "conversation": "what's my remaining amount?", "assistant_context": "", "application_context": "{}", "capability_result": ""},
+        payload,
+        expected_capability_id="banking.accounts.list",
+        sources={
+            "current_turn": "what's my remaining amount?",
+            "conversation": "what's my remaining amount?",
+            "assistant_context": "",
+            "application_context": "{}",
+            "capability_result": "",
+        },
     )
     assert ambiguous["code"] == "VALUE_EVIDENCE_MISSING"
 
@@ -589,40 +711,63 @@ def test_semantic_balance_and_account_enums_require_meaningful_customer_language
 def test_highest_balance_enum_cannot_be_grounded_by_unrelated_account_wording(monkeypatch):
     monkeypatch.setenv("ORAI_CONFIDENCE_GATE_MODE", "observe")
     payload = {
-        "intent_id": "TRANSFER_PREPARATION", "intent_confidence": 0.95,
-        "slot_confidence": 0.89, "entity_confidence": 0.91,
-        "capability_id": "banking.accounts.list", "capability_selection_confidence": 0.94,
-        "resolution": "READY", "slots": {"source_account_preference": "highest_balance"},
-        "entities": {}, "evidence": [
+        "intent_id": "TRANSFER_PREPARATION",
+        "intent_confidence": 0.95,
+        "slot_confidence": 0.89,
+        "entity_confidence": 0.91,
+        "capability_id": "banking.accounts.list",
+        "capability_selection_confidence": 0.94,
+        "resolution": "READY",
+        "slots": {"source_account_preference": "highest_balance"},
+        "entities": {},
+        "evidence": [
             {"field": "intent", "source": "current_turn", "quote": "use my Everyday account"},
-            {"field": "source_account_preference", "source": "current_turn", "quote": "use my Everyday account"},
+            {
+                "field": "source_account_preference",
+                "source": "current_turn",
+                "quote": "use my Everyday account",
+            },
         ],
     }
     _, decision = validate_interpretation_assessment(
-        payload, expected_capability_id="banking.accounts.list",
-        sources={"current_turn": "use my Everyday account", "conversation": "use my Everyday account", "assistant_context": "", "application_context": "{}", "capability_result": ""},
+        payload,
+        expected_capability_id="banking.accounts.list",
+        sources={
+            "current_turn": "use my Everyday account",
+            "conversation": "use my Everyday account",
+            "assistant_context": "",
+            "application_context": "{}",
+            "capability_result": "",
+        },
     )
     assert decision["code"] == "VALUE_EVIDENCE_MISSING"
 
 
-@pytest.mark.parametrize("capability_id, expected_intent", [
-    ("frontend.workspace.navigate", "WORKSPACE_NAVIGATION"),
-    ("frontend.account.select", "ACCOUNT_SELECTION"),
-])
+@pytest.mark.parametrize(
+    "capability_id, expected_intent",
+    [
+        ("frontend.workspace.navigate", "WORKSPACE_NAVIGATION"),
+        ("frontend.account.select", "ACCOUNT_SELECTION"),
+    ],
+)
 def test_registry_can_infer_only_unique_intent_for_a_capability(capability_id, expected_intent):
     from services.agent_runtime.interpretation import unique_intent_for_capability
+
     assert unique_intent_for_capability(capability_id) == expected_intent
 
 
 def test_shared_contacts_capability_does_not_infer_transfer_when_multiple_intents_own_it():
     from services.agent_runtime.interpretation import unique_intent_for_capability
+
     assert unique_intent_for_capability("banking.contacts.search") is None
 
 
 def test_flat_tool_assessment_transport_reconstructs_and_anchors_transfer(monkeypatch):
     from services.agent_runtime.interpretation import (
-        assessment_from_tool_arguments, unique_intent_for_capability,
+        assessment_from_tool_arguments,
+        unique_intent_for_capability,
     )
+
     monkeypatch.setenv("ORAI_CONFIDENCE_GATE_MODE", "observe")
     arguments = {
         "name_query": "John",
@@ -672,7 +817,9 @@ def test_observe_mode_does_not_fabricate_missing_confidence_but_enforce_mode_blo
     }
     monkeypatch.setenv("ORAI_CONFIDENCE_GATE_MODE", "observe")
     assessment, observed = validate_interpretation_assessment(
-        payload, expected_capability_id="frontend.workspace.navigate", sources=sources,
+        payload,
+        expected_capability_id="frontend.workspace.navigate",
+        sources=sources,
     )
     assert observed["decision"] == "PASS"
     assert observed["missing_dimensions"] == ["intent", "slot", "entity", "capability"]
@@ -680,12 +827,16 @@ def test_observe_mode_does_not_fabricate_missing_confidence_but_enforce_mode_blo
 
     monkeypatch.setenv("ORAI_CONFIDENCE_GATE_MODE", "enforce")
     for name in (
-        "ORAI_INTENT_CONFIDENCE_THRESHOLD", "ORAI_SLOT_CONFIDENCE_THRESHOLD",
-        "ORAI_ENTITY_CONFIDENCE_THRESHOLD", "ORAI_CAPABILITY_CONFIDENCE_THRESHOLD",
+        "ORAI_INTENT_CONFIDENCE_THRESHOLD",
+        "ORAI_SLOT_CONFIDENCE_THRESHOLD",
+        "ORAI_ENTITY_CONFIDENCE_THRESHOLD",
+        "ORAI_CAPABILITY_CONFIDENCE_THRESHOLD",
     ):
         monkeypatch.setenv(name, "0.8")
     _, enforced = validate_interpretation_assessment(
-        payload, expected_capability_id="frontend.workspace.navigate", sources=sources,
+        payload,
+        expected_capability_id="frontend.workspace.navigate",
+        sources=sources,
     )
     assert enforced["decision"] == "CLARIFY"
     assert enforced["code"] == "CONFIDENCE_MISSING"
@@ -694,7 +845,11 @@ def test_observe_mode_does_not_fabricate_missing_confidence_but_enforce_mode_blo
 def test_schema_rejection_reports_safe_field_paths_without_echoing_values(monkeypatch):
     monkeypatch.setenv("ORAI_CONFIDENCE_GATE_MODE", "observe")
     _, decision = validate_interpretation_assessment(
-        {"intent_id": "TRANSFER_PREPARATION", "capability_id": "banking.contacts.search", "intent_confidence": "not-a-number"},
+        {
+            "intent_id": "TRANSFER_PREPARATION",
+            "capability_id": "banking.contacts.search",
+            "intent_confidence": "not-a-number",
+        },
         expected_capability_id="banking.contacts.search",
         sources={"current_turn": "send 50 EUR to John", "conversation": "send 50 EUR to John"},
     )
@@ -705,6 +860,7 @@ def test_schema_rejection_reports_safe_field_paths_without_echoing_values(monkey
 
 def test_account_total_and_recent_transaction_variants_are_registry_fast_paths():
     from services.agent_runtime.intent_contracts import classify_canonical_read_intent
+
     assert classify_canonical_read_intent("what's my sum?") == "ACCOUNT_TOTAL_BALANCE"
     assert classify_canonical_read_intent("what's the total sum?") == "ACCOUNT_TOTAL_BALANCE"
     assert classify_canonical_read_intent("latest trans?") == "RECENT_TRANSACTIONS"
@@ -760,9 +916,15 @@ def test_flat_transport_schema_has_no_nested_assessment_or_schema_definitions():
     assert "$defs" not in schema
     assert "interpretation_assessment" not in schema["properties"]
     assert set(schema["properties"]) >= {
-        "orai_intent_id", "orai_intent_confidence", "orai_slot_confidence",
-        "orai_entity_confidence", "orai_capability_selection_confidence",
-        "orai_resolution", "orai_slots", "orai_entities", "orai_evidence",
+        "orai_intent_id",
+        "orai_intent_confidence",
+        "orai_slot_confidence",
+        "orai_entity_confidence",
+        "orai_capability_selection_confidence",
+        "orai_resolution",
+        "orai_slots",
+        "orai_entities",
+        "orai_evidence",
     }
     assert schema["required"] == []
 

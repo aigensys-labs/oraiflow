@@ -5,6 +5,7 @@ surface: explicit instruction-override attempts are blocked before the model
 runs, and ordinary assistant prose is returned through a flat response envelope
 that the runtime validates before sending it to the customer.
 """
+
 from __future__ import annotations
 
 import re
@@ -26,7 +27,6 @@ from services.agent_runtime.workspace_knowledge import (
     workspace_help_for_request,
 )
 from services.agent_runtime.assistant_capabilities import assistant_capability_catalogue_message
-
 
 CUSTOMER_RESPONSE_TOOL_NAME = "oraiflow_customer_response"
 
@@ -118,7 +118,9 @@ INSTRUCTION_OVERRIDE_MESSAGE = (
 
 CAPABILITY_HELP_MESSAGE = assistant_capability_catalogue_message()
 
-SOCIAL_REPLY_MESSAGE = "I’m here and ready to help with your ORAIflow banking tasks. What would you like to do?"
+SOCIAL_REPLY_MESSAGE = (
+    "I’m here and ready to help with your ORAIflow banking tasks. What would you like to do?"
+)
 
 
 SAVED_BENEFICIARIES_EXPLANATION = (
@@ -160,9 +162,7 @@ VERIFIED_MIXED_OPERATION_RESPONSE = (
     "I completed part of that request, but another part could not be verified or completed. "
     "Please review the confirmed result above; I will not infer or present missing information as successful."
 )
-VERIFIED_FRONTEND_FAILURE_RESPONSE = (
-    "The application did not confirm that action. Please check the current screen before trying again."
-)
+VERIFIED_FRONTEND_FAILURE_RESPONSE = "The application did not confirm that action. Please check the current screen before trying again."
 
 _SAVED_BENEFICIARY_CONCEPT = re.compile(
     r"\bwhat\s+(?:are|is)\s+(?:my\s+)?(?:saved\s+)?(?:beneficiar(?:y|ies)|payees|recipients|saved contacts)\b|"
@@ -235,11 +235,21 @@ def _safe_savings_education_message(message: str) -> bool:
     # General education must not become an individualized instruction to move
     # all available money. A clear warning such as "do not send all your money"
     # is safe and must not be rejected as if it were a recommendation.
-    for match in re.finditer(r"\b(?:move|put|send|deposit)\s+all\s+(?:of\s+)?your\s+money\b", value, re.IGNORECASE):
-        prefix = value[max(0, match.start() - 48):match.start()]
-        if not re.search(r"\b(?:not|never|don't|do not|shouldn't|should not|mustn't|must not|isn't necessary to|not necessary to)\s*$", prefix, re.IGNORECASE):
+    for match in re.finditer(
+        r"\b(?:move|put|send|deposit)\s+all\s+(?:of\s+)?your\s+money\b", value, re.IGNORECASE
+    ):
+        prefix = value[max(0, match.start() - 48) : match.start()]
+        if not re.search(
+            r"\b(?:not|never|don't|do not|shouldn't|should not|mustn't|must not|isn't necessary to|not necessary to)\s*$",
+            prefix,
+            re.IGNORECASE,
+        ):
             return False
-    if re.search(r"\b(?:your|this)\s+(?:savings\s+)?account\s+(?:pays|earns|will\s+earn)\b", value, re.IGNORECASE):
+    if re.search(
+        r"\b(?:your|this)\s+(?:savings\s+)?account\s+(?:pays|earns|will\s+earn)\b",
+        value,
+        re.IGNORECASE,
+    ):
         return False
     return True
 
@@ -252,20 +262,26 @@ def _is_generic_scope_response(message: str) -> bool:
     generic_messages = {
         " ".join(item.casefold().split())
         for item in (
-            OUT_OF_SCOPE_MESSAGE, CAPABILITY_HELP_MESSAGE, SOCIAL_REPLY_MESSAGE,
-            INSTRUCTION_OVERRIDE_MESSAGE, VERIFIED_PARTIAL_OPERATION_RESPONSE,
+            OUT_OF_SCOPE_MESSAGE,
+            CAPABILITY_HELP_MESSAGE,
+            SOCIAL_REPLY_MESSAGE,
+            INSTRUCTION_OVERRIDE_MESSAGE,
+            VERIFIED_PARTIAL_OPERATION_RESPONSE,
             "I cannot help with that.",
-            "I can't help with that.", "I am unable to help with that request.",
+            "I can't help with that.",
+            "I am unable to help with that request.",
         )
     }
     if value in generic_messages:
         return True
-    return bool(re.search(
-        r"^(?:i(?:’|')m here to help with oraiflow banking|i can only help with banking tasks|"
-        r"i retrieved the requested information from your verified oraiflow records\.|"
-        r"i can(?:not|'t|’t)\b.*\b(?:operating instructions|internal prompts?|hidden prompts?|security controls)\b)",
-        value,
-    ))
+    return bool(
+        re.search(
+            r"^(?:i(?:’|')m here to help with oraiflow banking|i can only help with banking tasks|"
+            r"i retrieved the requested information from your verified oraiflow records\.|"
+            r"i can(?:not|'t|’t)\b.*\b(?:operating instructions|internal prompts?|hidden prompts?|security controls)\b)",
+            value,
+        )
+    )
 
 
 def is_generic_scope_response(message: str) -> bool:
@@ -281,7 +297,8 @@ def _workspace_help_response(current_user_text: str) -> tuple[str, str] | None:
 
 
 def _candidate_clarification_message(
-    candidates: list[dict[str, Any]], candidate_intent_ids: list[str] | None = None,
+    candidates: list[dict[str, Any]],
+    candidate_intent_ids: list[str] | None = None,
 ) -> str | None:
     """Present plausible registered intents as a useful clarification, never as permission."""
     intents = get_registry().get("intents", {})
@@ -299,7 +316,8 @@ def _candidate_clarification_message(
     else:
         top_score = max((int(item.get("score", 0)) for item in discovered.values()), default=0)
         selected_ids = [
-            intent_id for intent_id, item in discovered.items()
+            intent_id
+            for intent_id, item in discovered.items()
             if top_score > 0 and int(item.get("score", 0)) >= max(1, top_score - 20)
         ]
     selected_ids = list(dict.fromkeys(selected_ids))[:3]
@@ -308,9 +326,11 @@ def _candidate_clarification_message(
     labels = [str(intents[item].get("description", item)).strip() for item in selected_ids]
     if len(labels) == 1:
         return f"I may be able to help with this: {labels[0]} Are you asking about that?"
-    return "I found a few potentially relevant ways to help:\n\n" + "\n".join(
-        f"{index}. {label}" for index, label in enumerate(labels, start=1)
-    ) + "\n\nWhich of these is closest to what you need?"
+    return (
+        "I found a few potentially relevant ways to help:\n\n"
+        + "\n".join(f"{index}. {label}" for index, label in enumerate(labels, start=1))
+        + "\n\nWhich of these is closest to what you need?"
+    )
 
 
 def finalize_response_envelope(
@@ -344,13 +364,17 @@ def finalize_response_envelope(
     task_statuses = {str(item.get("status", "")) for item in task_records}
     empty_task_capabilities = {
         str(capability_id)
-        for item in task_records if item.get("status") == "EMPTY"
-        for capability_id in item.get("capability_ids", []) if capability_id
+        for item in task_records
+        if item.get("status") == "EMPTY"
+        for capability_id in item.get("capability_ids", [])
+        if capability_id
     }
     partial_task_capabilities = {
         str(capability_id)
-        for item in task_records if item.get("status") == "PARTIAL"
-        for capability_id in item.get("capability_ids", []) if capability_id
+        for item in task_records
+        if item.get("status") == "PARTIAL"
+        for capability_id in item.get("capability_ids", [])
+        if capability_id
     }
     # The aggregate TurnOutcome keeps EMPTY and PARTIAL together for backward
     # compatibility. Per-task outcomes disambiguate them: EMPTY is a completed
@@ -359,14 +383,24 @@ def finalize_response_envelope(
         partial_capabilities - empty_task_capabilities
     ) | partial_task_capabilities
     has_successful_execution = bool(
-        completed_capabilities or completed_frontend_actions
+        completed_capabilities
+        or completed_frontend_actions
         or task_statuses.intersection({"SUCCEEDED", "PARTIAL", "EMPTY"})
     )
     has_incomplete_execution = bool(
-        effective_partial_capabilities or failed_capability_ids or failed_frontend_action_ids
-        or task_statuses.intersection({
-            "PARTIAL", "CLARIFICATION_REQUIRED", "REJECTED", "FAILED", "UNAVAILABLE", "NOT_EXECUTED",
-        })
+        effective_partial_capabilities
+        or failed_capability_ids
+        or failed_frontend_action_ids
+        or task_statuses.intersection(
+            {
+                "PARTIAL",
+                "CLARIFICATION_REQUIRED",
+                "REJECTED",
+                "FAILED",
+                "UNAVAILABLE",
+                "NOT_EXECUTED",
+            }
+        )
     )
     # A request for clarification is a first-class response contract. Candidate
     # IDs are untrusted model output and are intersected with this turn's
@@ -375,10 +409,12 @@ def finalize_response_envelope(
         return "INSTRUCTION_OVERRIDE", INSTRUCTION_OVERRIDE_MESSAGE
     if envelope.resolution in {"NEEDS_CLARIFICATION", "ABSTAIN"}:
         candidate_message = _candidate_clarification_message(
-            discovered_intent_candidates or [], envelope.candidate_intent_ids,
+            discovered_intent_candidates or [],
+            envelope.candidate_intent_ids,
         )
         question = str(
-            envelope.clarification_question or candidate_message
+            envelope.clarification_question
+            or candidate_message
             or "Could you clarify what you would like to understand or do?"
         ).strip()[:500]
         # A model-generated clarification must never erase an independently
@@ -428,12 +464,20 @@ def finalize_response_envelope(
         # before catalogue guidance can be returned.
         academy_intent = academy_personal_snapshot_intent(current_user_text)
         if academy_intent:
-            required_capability = get_registry().get("intents", {}).get(academy_intent, {}).get("execution_plan", {}).get("capability")
+            required_capability = (
+                get_registry()
+                .get("intents", {})
+                .get(academy_intent, {})
+                .get("execution_plan", {})
+                .get("capability")
+            )
             if required_capability and required_capability not in completed_capabilities:
                 return "CLARIFICATION", FINANCIAL_HEALTH_DATA_REQUIRED
         if completed_capabilities and not _is_generic_scope_response(envelope.message):
             return "IN_SCOPE", envelope.message.strip()
-        academy_message = academy_catalogue_explanation(current_user_text, require_customer_explanation=True)
+        academy_message = academy_catalogue_explanation(
+            current_user_text, require_customer_explanation=True
+        )
         if academy_message:
             return "EDUCATIONAL_GUIDANCE", academy_message
         if is_saved_beneficiary_concept_request(current_user_text):
@@ -442,7 +486,9 @@ def finalize_response_envelope(
             return "EDUCATIONAL_GUIDANCE", SAVINGS_EDUCATION_FALLBACK
         if is_loan_education_request(current_user_text):
             return "EDUCATIONAL_GUIDANCE", LOAN_EDUCATION_FALLBACK
-        candidate_message = _candidate_clarification_message(discovered_intent_candidates or [], envelope.candidate_intent_ids)
+        candidate_message = _candidate_clarification_message(
+            discovered_intent_candidates or [], envelope.candidate_intent_ids
+        )
         if candidate_message:
             return "CLARIFICATION", envelope.clarification_question or candidate_message
         return "OUT_OF_SCOPE", OUT_OF_SCOPE_MESSAGE
@@ -459,7 +505,11 @@ def finalize_response_envelope(
         and not _is_generic_scope_response(streamed_text)
     ):
         return "IN_SCOPE", streamed_text
-    if has_successful_execution and has_incomplete_execution and classification in {"OUT_OF_SCOPE", "CAPABILITY_HELP", "SOCIAL"}:
+    if (
+        has_successful_execution
+        and has_incomplete_execution
+        and classification in {"OUT_OF_SCOPE", "CAPABILITY_HELP", "SOCIAL"}
+    ):
         # A turn may contain several registered operations. A successful item
         # must not conceal another failed or incomplete item.
         return "CLARIFICATION", VERIFIED_MIXED_OPERATION_RESPONSE
@@ -469,7 +519,9 @@ def finalize_response_envelope(
         # explanation for a personalized Academy request after its required read.
         academy_intent = academy_personal_snapshot_intent(current_user_text)
         if academy_intent:
-            academy_message = academy_catalogue_explanation(current_user_text, require_customer_explanation=True)
+            academy_message = academy_catalogue_explanation(
+                current_user_text, require_customer_explanation=True
+            )
             if academy_message:
                 return "EDUCATIONAL_GUIDANCE", academy_message
         workspace_response = _workspace_help_response(current_user_text)
@@ -488,15 +540,30 @@ def finalize_response_envelope(
         if streamed_text and not _is_generic_scope_response(streamed_text):
             return "IN_SCOPE", streamed_text
         return "IN_SCOPE", VERIFIED_OPERATION_RESPONSE
-    if completed_frontend_actions and classification in {"OUT_OF_SCOPE", "CAPABILITY_HELP", "SOCIAL"}:
+    if completed_frontend_actions and classification in {
+        "OUT_OF_SCOPE",
+        "CAPABILITY_HELP",
+        "SOCIAL",
+    }:
         if not _is_generic_scope_response(envelope.message):
             return "IN_SCOPE", envelope.message.strip()
         if streamed_text and not _is_generic_scope_response(streamed_text):
             return "IN_SCOPE", streamed_text
-        return "IN_SCOPE", "The requested application action was confirmed. Please review the updated workspace."
-    if (partial_capabilities or failed_capability_ids) and classification in {"OUT_OF_SCOPE", "CAPABILITY_HELP", "SOCIAL"}:
+        return (
+            "IN_SCOPE",
+            "The requested application action was confirmed. Please review the updated workspace.",
+        )
+    if (partial_capabilities or failed_capability_ids) and classification in {
+        "OUT_OF_SCOPE",
+        "CAPABILITY_HELP",
+        "SOCIAL",
+    }:
         return "CLARIFICATION", VERIFIED_PARTIAL_OPERATION_RESPONSE
-    if failed_frontend_action_ids and classification in {"OUT_OF_SCOPE", "CAPABILITY_HELP", "SOCIAL"}:
+    if failed_frontend_action_ids and classification in {
+        "OUT_OF_SCOPE",
+        "CAPABILITY_HELP",
+        "SOCIAL",
+    }:
         return "CLARIFICATION", VERIFIED_FRONTEND_FAILURE_RESPONSE
     if classification in {"OUT_OF_SCOPE", "CAPABILITY_HELP", "SOCIAL"}:
         if is_saved_beneficiary_concept_request(current_user_text):
@@ -509,12 +576,20 @@ def finalize_response_envelope(
         # mapped capability result before the catalogue explanation is allowed.
         academy_intent = academy_personal_snapshot_intent(current_user_text)
         if academy_intent:
-            required_capability = get_registry().get("intents", {}).get(academy_intent, {}).get("execution_plan", {}).get("capability")
+            required_capability = (
+                get_registry()
+                .get("intents", {})
+                .get(academy_intent, {})
+                .get("execution_plan", {})
+                .get("capability")
+            )
             if required_capability and required_capability not in completed_capabilities:
                 return "CLARIFICATION", FINANCIAL_HEALTH_DATA_REQUIRED
         if completed_capabilities and not _is_generic_scope_response(envelope.message):
             return "IN_SCOPE", envelope.message.strip()
-        academy_message = academy_catalogue_explanation(current_user_text, require_customer_explanation=True)
+        academy_message = academy_catalogue_explanation(
+            current_user_text, require_customer_explanation=True
+        )
         if academy_message:
             return "EDUCATIONAL_GUIDANCE", academy_message
     # Retain deterministic domain fallbacks for bounded banking topics whose
@@ -531,8 +606,14 @@ def finalize_response_envelope(
         if explanation:
             return classification, explanation
         workspace_id = str(envelope.workspace_id or "").strip()
-        explanation = workspace_explanation_message(workspace_id) if workspace_id in workspace_catalogue() else None
-        if explanation and re.search(r"\b(?:workspace|tab|section|page|about|purpose)\b", current_user_text, re.IGNORECASE):
+        explanation = (
+            workspace_explanation_message(workspace_id)
+            if workspace_id in workspace_catalogue()
+            else None
+        )
+        if explanation and re.search(
+            r"\b(?:workspace|tab|section|page|about|purpose)\b", current_user_text, re.IGNORECASE
+        ):
             return classification, explanation
         return "OUT_OF_SCOPE", OUT_OF_SCOPE_MESSAGE
     if classification == "OUT_OF_SCOPE":
@@ -553,7 +634,9 @@ def finalize_response_envelope(
         topic_definition = catalogue.get(topic)
         if not topic_definition or not _topic_query_relevant(current_user_text, topic_definition):
             return "OUT_OF_SCOPE", OUT_OF_SCOPE_MESSAGE
-        if topic == "SAVED_BENEFICIARIES" and is_saved_beneficiary_concept_request(current_user_text):
+        if topic == "SAVED_BENEFICIARIES" and is_saved_beneficiary_concept_request(
+            current_user_text
+        ):
             return classification, SAVED_BENEFICIARIES_EXPLANATION
         if topic == "SAVINGS_WITH_PURPOSE" or topic == "SAVINGS_ACCOUNT_BASICS":
             if is_savings_education_request(current_user_text):
@@ -571,12 +654,17 @@ def finalize_response_envelope(
         if personal_snapshot_intent:
             intent = get_registry().get("intents", {}).get(personal_snapshot_intent, {})
             required_capability = intent.get("execution_plan", {}).get("capability")
-            if required_capability and required_capability not in (successful_capabilities or set()):
+            if required_capability and required_capability not in (
+                successful_capabilities or set()
+            ):
                 return "CLARIFICATION", FINANCIAL_HEALTH_DATA_REQUIRED
         if topic in {"FINANCIAL_HEALTH_BADGE", "BORROWING_AND_LEVERAGE"}:
             return classification, envelope.message.strip()
         if _UNVERIFIED_PRODUCT_DETAIL.search(envelope.message):
-            return classification, "I can explain the general concept, but I would need verified product or account information before giving a customer-specific rate or amount."
+            return (
+                classification,
+                "I can explain the general concept, but I would need verified product or account information before giving a customer-specific rate or amount.",
+            )
         return classification, envelope.message.strip()
     if classification == "SOCIAL":
         if not is_simple_social_turn(current_user_text):
@@ -622,7 +710,9 @@ def response_protocol_fallback(
     successes = set(successful_capabilities or set())
     frontend_successes = set(successful_frontend_actions or set())
     has_success = bool(successes or frontend_successes)
-    has_incomplete = bool(partial_or_empty_capabilities or failed_capabilities or failed_frontend_actions)
+    has_incomplete = bool(
+        partial_or_empty_capabilities or failed_capabilities or failed_frontend_actions
+    )
 
     if is_instruction_override_attempt(current_user_text):
         return INSTRUCTION_OVERRIDE_MESSAGE
@@ -634,7 +724,13 @@ def response_protocol_fallback(
     # no model-generated personal ratio/product facts are allowed.
     academy_intent = academy_personal_snapshot_intent(current_user_text)
     if academy_intent:
-        required_capability = get_registry().get("intents", {}).get(academy_intent, {}).get("execution_plan", {}).get("capability")
+        required_capability = (
+            get_registry()
+            .get("intents", {})
+            .get(academy_intent, {})
+            .get("execution_plan", {})
+            .get("capability")
+        )
         if required_capability and required_capability not in successes:
             return FINANCIAL_HEALTH_DATA_REQUIRED
 
@@ -642,20 +738,32 @@ def response_protocol_fallback(
     # the critical finalization invariant: the generic acknowledgement is only
     # a fallback when no substantive answer survived the response protocol.
     if has_success and value and not _is_generic_scope_response(value):
-        if is_savings_education_request(current_user_text) and not _safe_savings_education_message(value):
+        if is_savings_education_request(current_user_text) and not _safe_savings_education_message(
+            value
+        ):
             return SAVINGS_EDUCATION_FALLBACK
-        if is_loan_education_request(current_user_text) and academy_intent is None and _UNVERIFIED_PRODUCT_DETAIL.search(value):
+        if (
+            is_loan_education_request(current_user_text)
+            and academy_intent is None
+            and _UNVERIFIED_PRODUCT_DETAIL.search(value)
+        ):
             return LOAN_EDUCATION_FALLBACK
         return value
 
     if academy_intent:
-        academy_message = academy_catalogue_explanation(current_user_text, require_customer_explanation=True)
+        academy_message = academy_catalogue_explanation(
+            current_user_text, require_customer_explanation=True
+        )
         if academy_message:
             return academy_message
     if successes:
         return VERIFIED_OPERATION_RESPONSE
     if frontend_successes:
-        return value if value and not _is_generic_scope_response(value) else "The requested application action was confirmed. Please review the updated workspace."
+        return (
+            value
+            if value and not _is_generic_scope_response(value)
+            else "The requested application action was confirmed. Please review the updated workspace."
+        )
     if partial_or_empty_capabilities or failed_capabilities:
         return VERIFIED_PARTIAL_OPERATION_RESPONSE
     if failed_frontend_actions:
@@ -667,7 +775,9 @@ def response_protocol_fallback(
     if is_loan_education_request(current_user_text):
         return value if not _UNVERIFIED_PRODUCT_DETAIL.search(value) else LOAN_EDUCATION_FALLBACK
     if not is_instruction_override_attempt(current_user_text):
-        academy_message = academy_catalogue_explanation(current_user_text, require_customer_explanation=True)
+        academy_message = academy_catalogue_explanation(
+            current_user_text, require_customer_explanation=True
+        )
         if academy_message:
             return academy_message
         workspace_response = _workspace_help_response(current_user_text)
@@ -676,5 +786,8 @@ def response_protocol_fallback(
         candidate_message = _candidate_clarification_message(discovered_intent_candidates or [])
         if candidate_message:
             return candidate_message
-    return SOCIAL_REPLY_MESSAGE if should_accept_unstructured_response(current_user_text or value) else OUT_OF_SCOPE_MESSAGE
-
+    return (
+        SOCIAL_REPLY_MESSAGE
+        if should_accept_unstructured_response(current_user_text or value)
+        else OUT_OF_SCOPE_MESSAGE
+    )

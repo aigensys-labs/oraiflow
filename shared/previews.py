@@ -1,4 +1,5 @@
 """Canonical action-preview signing helpers."""
+
 from __future__ import annotations
 
 import hashlib
@@ -25,17 +26,27 @@ def canonical_preview_payload(row: dict[str, Any]) -> bytes:
         "policy_details": row.get("policy_details") or {},
         "policy_version": str(row["policy_version"]),
         "policy_decision": str(row["policy_decision"]),
-        "expires_at": row["expires_at"].isoformat() if isinstance(row["expires_at"], datetime) else str(row["expires_at"]),
+        "expires_at": (
+            row["expires_at"].isoformat()
+            if isinstance(row["expires_at"], datetime)
+            else str(row["expires_at"])
+        ),
     }
-    return json.dumps(fields, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    return json.dumps(fields, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode(
+        "utf-8"
+    )
 
 
 def preview_digest(row: dict[str, Any], secret: str | None = None) -> str:
     """Create the keyed integrity digest for a synthetic transfer preview."""
-    key = (secret or os.getenv("PREVIEW_SIGNING_SECRET", "local-preview-signing-secret-change-me")).encode("utf-8")
+    key = (
+        secret or os.getenv("PREVIEW_SIGNING_SECRET", "local-preview-signing-secret-change-me")
+    ).encode("utf-8")
     return hmac.new(key, canonical_preview_payload(row), hashlib.sha256).hexdigest()
 
 
-def verify_preview_digest(row: dict[str, Any], supplied_digest: str, secret: str | None = None) -> bool:
+def verify_preview_digest(
+    row: dict[str, Any], supplied_digest: str, secret: str | None = None
+) -> bool:
     """Verify the supplied digest against the stored synthetic transfer preview."""
     return hmac.compare_digest(preview_digest(row, secret), str(supplied_digest))

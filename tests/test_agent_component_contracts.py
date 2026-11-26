@@ -37,12 +37,14 @@ def test_transaction_component_schedules_mcp_read_when_no_verified_result_exists
     state = {"messages": [HumanMessage(content="Show my recent transactions")], "copilotkit": {}}
     response = AIMessage(
         content="",
-        tool_calls=[{
-            "name": "render_transaction_list",
-            "args": {"title": "Recent activity", "transactions": []},
-            "id": "component-1",
-            "type": "tool_call",
-        }],
+        tool_calls=[
+            {
+                "name": "render_transaction_list",
+                "args": {"title": "Recent activity", "transactions": []},
+                "id": "component-1",
+                "type": "tool_call",
+            }
+        ],
     )
 
     calls = _component_preflight_tool_calls(response, state)
@@ -56,28 +58,36 @@ def test_account_component_uses_selected_account_context_for_mcp_preflight():
     state = {
         "messages": [HumanMessage(content="How much money do I have?")],
         "copilotkit": {
-            "context": [{
-                "description": "Current ORAIflow workspace and account selection",
-                "value": {
-                    "workspace": "Overview",
-                    "selected_account_id": "acc-002",
-                    "selected_account_name": "Savings account",
-                    "accounts": [
-                        {"account_id": "acc-002", "account_name": "Savings account", "currency": "EUR"},
-                    ],
-                    "contacts": [],
-                },
-            }],
+            "context": [
+                {
+                    "description": "Current ORAIflow workspace and account selection",
+                    "value": {
+                        "workspace": "Overview",
+                        "selected_account_id": "acc-002",
+                        "selected_account_name": "Savings account",
+                        "accounts": [
+                            {
+                                "account_id": "acc-002",
+                                "account_name": "Savings account",
+                                "currency": "EUR",
+                            },
+                        ],
+                        "contacts": [],
+                    },
+                }
+            ],
         },
     }
     response = AIMessage(
         content="",
-        tool_calls=[{
-            "name": "render_account_summary",
-            "args": {"title": "Balances", "accounts": []},
-            "id": "component-2",
-            "type": "tool_call",
-        }],
+        tool_calls=[
+            {
+                "name": "render_account_summary",
+                "args": {"title": "Balances", "accounts": []},
+                "id": "component-2",
+                "type": "tool_call",
+            }
+        ],
     )
 
     calls = _component_preflight_tool_calls(response, state)
@@ -97,12 +107,14 @@ def test_existing_mcp_read_is_not_scheduled_twice():
     }
     response = AIMessage(
         content="",
-        tool_calls=[{
-            "name": "render_transaction_list",
-            "args": {"title": "Recent activity", "transactions": []},
-            "id": "component-3",
-            "type": "tool_call",
-        }],
+        tool_calls=[
+            {
+                "name": "render_transaction_list",
+                "args": {"title": "Recent activity", "transactions": []},
+                "id": "component-3",
+                "type": "tool_call",
+            }
+        ],
     )
 
     assert _component_preflight_tool_calls(response, state) == []
@@ -114,10 +126,20 @@ def test_existing_mcp_read_is_not_scheduled_twice():
 def test_old_turn_mcp_result_does_not_satisfy_current_turn_component_contract():
     messages = [
         HumanMessage(content="Show my previous transactions"),
-        _trusted_tool_message("get_recent_transactions", [{
-            "transaction_id": "old", "account_name": "Everyday", "description": "Old",
-            "amount_minor": -100, "currency": "EUR", "status": "BOOKED", "occurred_at": None,
-        }]),
+        _trusted_tool_message(
+            "get_recent_transactions",
+            [
+                {
+                    "transaction_id": "old",
+                    "account_name": "Everyday",
+                    "description": "Old",
+                    "amount_minor": -100,
+                    "currency": "EUR",
+                    "status": "BOOKED",
+                    "occurred_at": None,
+                }
+            ],
+        ),
         HumanMessage(content="Show my latest transactions"),
     ]
 
@@ -128,28 +150,38 @@ def test_old_turn_mcp_result_does_not_satisfy_current_turn_component_contract():
 
 
 def test_component_props_are_replaced_with_verified_mcp_result_and_evidence():
-    verified = [{
-        "transaction_id": "txn-verified",
-        "account_name": "Everyday account",
-        "description": "Coffee",
-        "category": "Dining",
-        "amount_minor": -485,
-        "currency": "EUR",
-        "status": "BOOKED",
-        "occurred_at": None,
-    }]
+    verified = [
+        {
+            "transaction_id": "txn-verified",
+            "account_name": "Everyday account",
+            "description": "Coffee",
+            "category": "Dining",
+            "amount_minor": -485,
+            "currency": "EUR",
+            "status": "BOOKED",
+            "occurred_at": None,
+        }
+    ]
     state = {
-        "messages": [HumanMessage(content="Show my transactions"), _trusted_tool_message("get_recent_transactions", verified)],
+        "messages": [
+            HumanMessage(content="Show my transactions"),
+            _trusted_tool_message("get_recent_transactions", verified),
+        ],
         "copilotkit": {},
     }
     response = AIMessage(
         content="",
-        tool_calls=[{
-            "name": "render_transaction_list",
-            "args": {"title": "Model title", "transactions": [{"description": "model-invented"}]},
-            "id": "component-4",
-            "type": "tool_call",
-        }],
+        tool_calls=[
+            {
+                "name": "render_transaction_list",
+                "args": {
+                    "title": "Model title",
+                    "transactions": [{"description": "model-invented"}],
+                },
+                "id": "component-4",
+                "type": "tool_call",
+            }
+        ],
     )
 
     bound = _bind_verified_component_data(response, state)
@@ -163,12 +195,14 @@ def test_missing_verified_component_result_returns_customer_safe_message():
     state = {"messages": [HumanMessage(content="Show my transactions")], "copilotkit": {}}
     response = AIMessage(
         content="",
-        tool_calls=[{
-            "name": "render_transaction_list",
-            "args": {"title": "Recent activity", "transactions": []},
-            "id": "component-5",
-            "type": "tool_call",
-        }],
+        tool_calls=[
+            {
+                "name": "render_transaction_list",
+                "args": {"title": "Recent activity", "transactions": []},
+                "id": "component-5",
+                "type": "tool_call",
+            }
+        ],
     )
 
     bound = _bind_verified_component_data(response, state)
@@ -180,12 +214,18 @@ def test_missing_verified_component_result_returns_customer_safe_message():
 
 def test_connector_error_is_detected_as_authoritative_failure():
     failure = create_result_envelope(
-        "banking.transactions.recent", "UNAVAILABLE",
-        error={"code": "BANKING_DATA_UNAVAILABLE", "retryable": True}, trace_id="test-trace",
+        "banking.transactions.recent",
+        "UNAVAILABLE",
+        error={"code": "BANKING_DATA_UNAVAILABLE", "retryable": True},
+        trace_id="test-trace",
     )
     messages = [
         HumanMessage(content="Show my recent transactions"),
-        ToolMessage(name="get_recent_transactions", tool_call_id="mcp-call-error", content=json.dumps(failure)),
+        ToolMessage(
+            name="get_recent_transactions",
+            tool_call_id="mcp-call-error",
+            content=json.dumps(failure),
+        ),
     ]
 
     assert _connector_error_for_turn(messages) == "get_recent_transactions"
@@ -196,12 +236,18 @@ def test_connector_error_is_detected_as_authoritative_failure():
 
 def test_connector_error_from_an_older_turn_does_not_poison_new_turn():
     failure = create_result_envelope(
-        "banking.transactions.recent", "UNAVAILABLE",
-        error={"code": "BANKING_DATA_UNAVAILABLE", "retryable": True}, trace_id="test-trace",
+        "banking.transactions.recent",
+        "UNAVAILABLE",
+        error={"code": "BANKING_DATA_UNAVAILABLE", "retryable": True},
+        trace_id="test-trace",
     )
     messages = [
         HumanMessage(content="Show my recent transactions"),
-        ToolMessage(name="get_recent_transactions", tool_call_id="mcp-call-error", content=json.dumps(failure)),
+        ToolMessage(
+            name="get_recent_transactions",
+            tool_call_id="mcp-call-error",
+            content=json.dumps(failure),
+        ),
         HumanMessage(content="Show my accounts"),
     ]
 
@@ -209,21 +255,49 @@ def test_connector_error_from_an_older_turn_does_not_poison_new_turn():
 
 
 def test_invalid_currency_and_type_are_rejected_by_registry_before_rendering():
-    invalid = [{
-        "transaction_id": "txn-bad", "account_name": "Everyday account", "description": "Coffee",
-        "category": None, "amount_minor": -485, "currency": "eur", "status": "BOOKED", "occurred_at": None,
-    }]
+    invalid = [
+        {
+            "transaction_id": "txn-bad",
+            "account_name": "Everyday account",
+            "description": "Coffee",
+            "category": None,
+            "amount_minor": -485,
+            "currency": "eur",
+            "status": "BOOKED",
+            "occurred_at": None,
+        }
+    ]
     forged = {
-        "schema_version": "1.0.0", "capability": "banking.transactions.recent", "outcome": "SUCCESS",
+        "schema_version": "1.0.0",
+        "capability": "banking.transactions.recent",
+        "outcome": "SUCCESS",
         "data": invalid,
-        "evidence": {"source": "mcp", "scope": "authenticated_customer_transactions", "retrieved_at": "2026-11-21T00:00:00+00:00", "completeness": "COMPLETE", "trace_id": "t"},
-        "error": None, "trace_id": "t", "trust_class": "untrusted_banking_data",
+        "evidence": {
+            "source": "mcp",
+            "scope": "authenticated_customer_transactions",
+            "retrieved_at": "2026-11-21T00:00:00+00:00",
+            "completeness": "COMPLETE",
+            "trace_id": "t",
+        },
+        "error": None,
+        "trace_id": "t",
+        "trust_class": "untrusted_banking_data",
     }
     state = {
-        "messages": [HumanMessage(content="Show my transactions"), ToolMessage(name="get_recent_transactions", tool_call_id="bad", content=json.dumps(forged))],
+        "messages": [
+            HumanMessage(content="Show my transactions"),
+            ToolMessage(
+                name="get_recent_transactions", tool_call_id="bad", content=json.dumps(forged)
+            ),
+        ],
         "copilotkit": {},
     }
-    response = AIMessage(content="", tool_calls=[{"name": "render_transaction_list", "args": {}, "id": "invalid", "type": "tool_call"}])
+    response = AIMessage(
+        content="",
+        tool_calls=[
+            {"name": "render_transaction_list", "args": {}, "id": "invalid", "type": "tool_call"}
+        ],
+    )
 
     bound = _bind_verified_component_data(response, state)
 
@@ -232,11 +306,18 @@ def test_invalid_currency_and_type_are_rejected_by_registry_before_rendering():
 
 
 def test_mcp_connector_response_uses_the_common_result_envelope():
-    payload = [{
-        "transaction_id": "txn-1", "account_name": "Everyday account", "description": "Coffee",
-        "category": None, "amount_minor": -485, "currency": "EUR", "status": "BOOKED",
-        "occurred_at": "2026-11-20T10:00:00Z",
-    }]
+    payload = [
+        {
+            "transaction_id": "txn-1",
+            "account_name": "Everyday account",
+            "description": "Coffee",
+            "category": None,
+            "amount_minor": -485,
+            "currency": "EUR",
+            "status": "BOOKED",
+            "occurred_at": "2026-11-20T10:00:00Z",
+        }
+    ]
     envelope = create_result_envelope(
         "banking.transactions.recent", "SUCCESS", data=payload, trace_id="mcp-trace-1"
     )
@@ -258,8 +339,10 @@ def test_mcp_connector_response_rejects_raw_payload_without_common_envelope():
 
 def test_mcp_connector_error_is_a_normalized_rejected_envelope():
     envelope = create_result_envelope(
-        "banking.accounts.balance", "REJECTED",
-        error={"code": "ACCOUNT_NOT_ACCESSIBLE", "retryable": False}, trace_id="mcp-reject-1",
+        "banking.accounts.balance",
+        "REJECTED",
+        error={"code": "ACCOUNT_NOT_ACCESSIBLE", "retryable": False},
+        trace_id="mcp-reject-1",
     )
     parsed = parse_result_envelope("banking.accounts.balance", json.dumps(envelope))
     assert parsed["outcome"] == "REJECTED"
@@ -290,7 +373,10 @@ def test_read_capability_strips_runtime_assessment_metadata_before_occf_validati
 
     observed = []
     valid = create_result_envelope(
-        "banking.transactions.recent", "EMPTY", data=[], trace_id="mcp-metadata-strip",
+        "banking.transactions.recent",
+        "EMPTY",
+        data=[],
+        trace_id="mcp-metadata-strip",
     )
 
     async def capture_connector(name, arguments=None):
@@ -298,13 +384,18 @@ def test_read_capability_strips_runtime_assessment_metadata_before_occf_validati
         return json.dumps(valid)
 
     monkeypatch.setattr(agent_module, "call_banking_tool", capture_connector)
-    raw = asyncio.run(agent_module._call_read_capability("get_recent_transactions", {
-        "limit": 6,
-        "orai_intent_id": "TRANSACTION_ANALYSIS",
-        "orai_slots": {"flow": "outflows"},
-        "orai_evidence": [{"field": "flow", "source": "current_turn", "quote": "spend"}],
-        "interpretation_assessment": {"intent_id": "TRANSACTION_ANALYSIS"},
-    }))
+    raw = asyncio.run(
+        agent_module._call_read_capability(
+            "get_recent_transactions",
+            {
+                "limit": 6,
+                "orai_intent_id": "TRANSACTION_ANALYSIS",
+                "orai_slots": {"flow": "outflows"},
+                "orai_evidence": [{"field": "flow", "source": "current_turn", "quote": "spend"}],
+                "interpretation_assessment": {"intent_id": "TRANSACTION_ANALYSIS"},
+            },
+        )
+    )
 
     envelope = json.loads(raw)
     assert observed == [("get_recent_transactions", {"limit": 6})]
@@ -360,12 +451,24 @@ def test_read_capability_rejects_malformed_connector_response(monkeypatch):
     import services.agent_runtime.agent as agent_module
 
     async def malformed_connector(_name, _arguments=None):
-        return json.dumps({
-            "schema_version": "1.0.0", "capability": "banking.transactions.recent",
-            "outcome": "SUCCESS", "data": [{"transaction_id": "txn-1", "amount_minor": "not-an-integer"}],
-            "evidence": {"source": "mcp", "scope": "authenticated_customer_transactions", "retrieved_at": "2026-11-21T00:00:00Z", "completeness": "COMPLETE", "trace_id": "bad"},
-            "error": None, "trace_id": "bad", "trust_class": "untrusted_banking_data",
-        })
+        return json.dumps(
+            {
+                "schema_version": "1.0.0",
+                "capability": "banking.transactions.recent",
+                "outcome": "SUCCESS",
+                "data": [{"transaction_id": "txn-1", "amount_minor": "not-an-integer"}],
+                "evidence": {
+                    "source": "mcp",
+                    "scope": "authenticated_customer_transactions",
+                    "retrieved_at": "2026-11-21T00:00:00Z",
+                    "completeness": "COMPLETE",
+                    "trace_id": "bad",
+                },
+                "error": None,
+                "trace_id": "bad",
+                "trust_class": "untrusted_banking_data",
+            }
+        )
 
     monkeypatch.setattr(agent_module, "call_banking_tool", malformed_connector)
     raw = asyncio.run(agent_module._call_read_capability("get_recent_transactions", {"limit": 6}))
@@ -383,8 +486,17 @@ def test_registry_declared_presentation_transform_pipeline_is_generic():
         {"account_name": "Savings account", "transaction_id": "txn-2"},
     ]
     pipeline = [
-        {"op": "filter_array_by_context", "property": "account_name", "context_key": "selected_account_name", "ignore_values": ["All accounts"]},
-        {"op": "set_evidence_scope_from_context", "context_key": "selected_account_id", "prefix": "selected_account:"},
+        {
+            "op": "filter_array_by_context",
+            "property": "account_name",
+            "context_key": "selected_account_name",
+            "ignore_values": ["All accounts"],
+        },
+        {
+            "op": "set_evidence_scope_from_context",
+            "context_key": "selected_account_id",
+            "prefix": "selected_account:",
+        },
     ]
 
     transformed = _apply_presentation_transform(pipeline, records, context, evidence)
@@ -394,8 +506,15 @@ def test_registry_declared_presentation_transform_pipeline_is_generic():
 
 
 def test_registry_declared_account_transform_wraps_balance_object():
-    account = {"account_id": "acc-001", "account_name": "Everyday", "currency": "EUR", "balance_minor": 1000}
-    assert _apply_presentation_transform([{"op": "wrap_object_as_array"}], account, {}, {}) == [account]
+    account = {
+        "account_id": "acc-001",
+        "account_name": "Everyday",
+        "currency": "EUR",
+        "balance_minor": 1000,
+    }
+    assert _apply_presentation_transform([{"op": "wrap_object_as_array"}], account, {}, {}) == [
+        account
+    ]
 
 
 def test_read_capability_honors_retry_on_categories(monkeypatch):
@@ -407,7 +526,9 @@ def test_read_capability_honors_retry_on_categories(monkeypatch):
     capability_id, contract = registered
     restricted = deepcopy(contract)
     restricted["execution"]["retry"]["retry_on"] = ["TIMEOUT"]
-    monkeypatch.setattr(agent_module, "capability_by_name", lambda _name, kind=None: (capability_id, restricted))
+    monkeypatch.setattr(
+        agent_module, "capability_by_name", lambda _name, kind=None: (capability_id, restricted)
+    )
     calls = []
 
     async def transport_failure(_name, _arguments=None):
@@ -429,60 +550,134 @@ def test_invalid_application_context_is_ignored_for_preflight(monkeypatch):
     state = {
         "messages": [HumanMessage(content="How much money do I have?")],
         "copilotkit": {
-            "context": [{
-                "description": "Current ORAIflow workspace and account selection",
-                "value": {"workspace": "Overview", "selected_account_id": "acc-999", "selected_account_name": "Forged", "accounts": [], "contacts": []},
-            }],
+            "context": [
+                {
+                    "description": "Current ORAIflow workspace and account selection",
+                    "value": {
+                        "workspace": "Overview",
+                        "selected_account_id": "acc-999",
+                        "selected_account_name": "Forged",
+                        "accounts": [],
+                        "contacts": [],
+                    },
+                }
+            ],
         },
     }
     assert agent_module._selected_account_context(state) == {}
 
 
 CONTACTS = [
-    {"contact_id": "ct-john-carter", "full_name": "John Carter", "bank_name": "Northstar Bank", "account_reference_masked": "DEMO ···· 1042", "currency": "EUR", "status": "ACTIVE"},
-    {"contact_id": "ct-john-mitchell", "full_name": "John Mitchell", "bank_name": "Union Financial", "account_reference_masked": "DEMO ···· 2781", "currency": "EUR", "status": "ACTIVE"},
+    {
+        "contact_id": "ct-john-carter",
+        "full_name": "John Carter",
+        "bank_name": "Northstar Bank",
+        "account_reference_masked": "DEMO ···· 1042",
+        "currency": "EUR",
+        "status": "ACTIVE",
+    },
+    {
+        "contact_id": "ct-john-mitchell",
+        "full_name": "John Mitchell",
+        "bank_name": "Union Financial",
+        "account_reference_masked": "DEMO ···· 2781",
+        "currency": "EUR",
+        "status": "ACTIVE",
+    },
 ]
 
 
 def _contact_context():
     return {
-        "workspace": "Contacts", "selected_account_id": "acc-001", "selected_account_name": "Everyday account",
-        "accounts": [{"account_id": "acc-001", "account_name": "Everyday account", "currency": "EUR"}],
-        "contacts": [{"contact_id": contact["contact_id"], "full_name": contact["full_name"], "status": contact["status"]} for contact in CONTACTS],
+        "workspace": "Contacts",
+        "selected_account_id": "acc-001",
+        "selected_account_name": "Everyday account",
+        "accounts": [
+            {"account_id": "acc-001", "account_name": "Everyday account", "currency": "EUR"}
+        ],
+        "contacts": [
+            {
+                "contact_id": contact["contact_id"],
+                "full_name": contact["full_name"],
+                "status": contact["status"],
+            }
+            for contact in CONTACTS
+        ],
     }
 
 
 def test_model_cannot_open_transfer_without_a_current_turn_contact_search():
-    proposed = AIMessage(content="", tool_calls=[{
-        "name": "prepare_transfer_draft",
-        "args": {"beneficiary": "John Carter", "beneficiary_contact_id": "ct-john-carter", "amount": "50", "currency": "EUR", "from_account_id": "acc-001"},
-        "id": "model-transfer", "type": "tool_call",
-    }])
+    proposed = AIMessage(
+        content="",
+        tool_calls=[
+            {
+                "name": "prepare_transfer_draft",
+                "args": {
+                    "beneficiary": "John Carter",
+                    "beneficiary_contact_id": "ct-john-carter",
+                    "amount": "50",
+                    "currency": "EUR",
+                    "from_account_id": "acc-001",
+                },
+                "id": "model-transfer",
+                "type": "tool_call",
+            }
+        ],
+    )
     result = _validate_proposed_tool_calls(
         proposed, [HumanMessage(content="Send 50 EUR to John Carter")], _contact_context()
     )
     assert not result.tool_calls
     assert "verify the recipient" in result.content
 
+
 def test_model_cannot_choose_between_duplicate_contacts_without_clarification():
-    proposed = AIMessage(content="", tool_calls=[{
-        "name": "prepare_transfer_draft",
-        "args": {"beneficiary": "John Carter", "beneficiary_contact_id": "ct-john-carter", "amount": "50", "currency": "EUR", "from_account_id": "acc-001"},
-        "id": "model-transfer", "type": "tool_call",
-    }])
-    messages = [HumanMessage(content="Send 50 EUR to John"), _trusted_tool_message("search_contacts", CONTACTS, "contact-search-3")]
+    proposed = AIMessage(
+        content="",
+        tool_calls=[
+            {
+                "name": "prepare_transfer_draft",
+                "args": {
+                    "beneficiary": "John Carter",
+                    "beneficiary_contact_id": "ct-john-carter",
+                    "amount": "50",
+                    "currency": "EUR",
+                    "from_account_id": "acc-001",
+                },
+                "id": "model-transfer",
+                "type": "tool_call",
+            }
+        ],
+    )
+    messages = [
+        HumanMessage(content="Send 50 EUR to John"),
+        _trusted_tool_message("search_contacts", CONTACTS, "contact-search-3"),
+    ]
     result = _validate_proposed_tool_calls(proposed, messages, _contact_context())
     assert not result.tool_calls
     assert "Which person did you mean?" in result.content
     assert "John Carter" in result.content and "John Mitchell" in result.content
     assert workflow_from_message(result)["stage"] == "AWAITING_CONTACT"
 
+
 def test_model_cannot_choose_first_source_account_when_multiple_are_available():
-    proposed = AIMessage(content="", tool_calls=[{
-        "name": "prepare_transfer_draft",
-        "args": {"beneficiary": "John Carter", "beneficiary_contact_id": "ct-john-carter", "amount": "50", "currency": "EUR", "from_account_id": "acc-001"},
-        "id": "model-transfer-source", "type": "tool_call",
-    }])
+    proposed = AIMessage(
+        content="",
+        tool_calls=[
+            {
+                "name": "prepare_transfer_draft",
+                "args": {
+                    "beneficiary": "John Carter",
+                    "beneficiary_contact_id": "ct-john-carter",
+                    "amount": "50",
+                    "currency": "EUR",
+                    "from_account_id": "acc-001",
+                },
+                "id": "model-transfer-source",
+                "type": "tool_call",
+            }
+        ],
+    )
     context = {
         "selected_account_id": None,
         "accounts": [
@@ -491,27 +686,58 @@ def test_model_cannot_choose_first_source_account_when_multiple_are_available():
             {"account_id": "acc-003", "account_name": "Travel wallet", "currency": "EUR"},
         ],
         "contacts": [
-            {"contact_id": CONTACTS[0]["contact_id"], "full_name": CONTACTS[0]["full_name"], "status": "ACTIVE"},
+            {
+                "contact_id": CONTACTS[0]["contact_id"],
+                "full_name": CONTACTS[0]["full_name"],
+                "status": "ACTIVE",
+            },
         ],
     }
-    messages = [HumanMessage(content="Send 50 EUR to John Carter"), _trusted_tool_message("search_contacts", [CONTACTS[0]], "source-search-1")]
+    messages = [
+        HumanMessage(content="Send 50 EUR to John Carter"),
+        _trusted_tool_message("search_contacts", [CONTACTS[0]], "source-search-1"),
+    ]
     result = _validate_proposed_tool_calls(proposed, messages, context)
     assert not result.tool_calls
     assert "Which source account should I use?" in result.content
     assert "first account" in result.content
 
+
 def test_model_may_use_one_unique_currency_account_without_a_current_selection():
-    proposed = AIMessage(content="", tool_calls=[{
-        "name": "prepare_transfer_draft",
-        "args": {"beneficiary": "John Carter", "beneficiary_contact_id": "ct-john-carter", "amount": "50", "currency": "EUR", "from_account_id": "acc-001"},
-        "id": "model-transfer-unique-source", "type": "tool_call",
-    }])
+    proposed = AIMessage(
+        content="",
+        tool_calls=[
+            {
+                "name": "prepare_transfer_draft",
+                "args": {
+                    "beneficiary": "John Carter",
+                    "beneficiary_contact_id": "ct-john-carter",
+                    "amount": "50",
+                    "currency": "EUR",
+                    "from_account_id": "acc-001",
+                },
+                "id": "model-transfer-unique-source",
+                "type": "tool_call",
+            }
+        ],
+    )
     context = {
         "selected_account_id": None,
-        "accounts": [{"account_id": "acc-001", "account_name": "Everyday account", "currency": "EUR"}],
-        "contacts": [{"contact_id": CONTACTS[0]["contact_id"], "full_name": CONTACTS[0]["full_name"], "status": "ACTIVE"}],
+        "accounts": [
+            {"account_id": "acc-001", "account_name": "Everyday account", "currency": "EUR"}
+        ],
+        "contacts": [
+            {
+                "contact_id": CONTACTS[0]["contact_id"],
+                "full_name": CONTACTS[0]["full_name"],
+                "status": "ACTIVE",
+            }
+        ],
     }
-    messages = [HumanMessage(content="Send 50 EUR to John Carter"), _trusted_tool_message("search_contacts", [CONTACTS[0]], "source-search-2")]
+    messages = [
+        HumanMessage(content="Send 50 EUR to John Carter"),
+        _trusted_tool_message("search_contacts", [CONTACTS[0]], "source-search-2"),
+    ]
     result = _validate_proposed_tool_calls(proposed, messages, context)
     assert result.tool_calls and result.tool_calls[0]["name"] == "prepare_transfer_draft"
 
@@ -548,12 +774,18 @@ def _transfer_assessment(beneficiary, amount, quote):
         "evidence": [
             {"field": "intent", "source": "current_turn", "quote": quote},
             {"field": "amount", "source": "current_turn", "quote": str(amount)},
-            {"field": "currency", "source": "current_turn", "quote": "EUR"} if "EUR" in quote else {"field": "currency", "source": "application_context", "quote": '"currency": "EUR"'},
+            (
+                {"field": "currency", "source": "current_turn", "quote": "EUR"}
+                if "EUR" in quote
+                else {
+                    "field": "currency",
+                    "source": "application_context",
+                    "quote": '"currency": "EUR"',
+                }
+            ),
             {"field": "beneficiary", "source": "current_turn", "quote": beneficiary},
         ],
     }
-
-
 
 
 def test_explicit_transfer_request_enters_the_canonical_workflow_before_semantic_fallback():
@@ -589,6 +821,7 @@ def test_explicit_transfer_source_preference_is_preserved_for_verified_account_r
     assert workflow["source_account_preference"] == "highest_balance"
     assert workflow["source_account_id"] == ""
 
+
 def test_production_transfer_continues_carter_then_everyday_and_opens_once():
     from services.agent_runtime.agent import _handle_transfer_workflow
 
@@ -596,19 +829,56 @@ def test_production_transfer_continues_carter_then_everyday_and_opens_once():
     current_turn = "send 50 EUR to John"
     assessment = _transfer_assessment("John", "50", current_turn)
     request = HumanMessage(content=current_turn)
-    proposed = AIMessage(content="", tool_calls=[{
-        "name": "search_contacts",
-        "args": {"name_query": "John", "interpretation_assessment": assessment},
-        "id": "search-john",
-        "type": "tool_call",
-    }])
+    proposed = AIMessage(
+        content="",
+        tool_calls=[
+            {
+                "name": "search_contacts",
+                "args": {"name_query": "John", "interpretation_assessment": assessment},
+                "id": "search-john",
+                "type": "tool_call",
+            }
+        ],
+    )
     validated = _validate_proposed_tool_calls(proposed, [request], context)
-    result = create_result_envelope("banking.contacts.search", "SUCCESS", data=[
-        {"contact_id": "ct-john-carter", "full_name": "John Carter", "bank_name": "Northstar Bank", "account_reference_masked": "···· 1042", "currency": "EUR", "status": "ACTIVE"},
-        {"contact_id": "ct-john-mitchell", "full_name": "John Mitchell", "bank_name": "Union Financial", "account_reference_masked": "···· 2781", "currency": "EUR", "status": "ACTIVE"},
-    ], trace_id="contacts-test")
-    searched = ToolMessage(name="search_contacts", tool_call_id="search-john", content=json.dumps(result))
-    state = {"messages": [request, validated, searched], "copilotkit": {"context": [{"description": "Current ORAIflow workspace and account selection", "value": context}], "actions": [{"name": "prepare_transfer_draft"}]}}
+    result = create_result_envelope(
+        "banking.contacts.search",
+        "SUCCESS",
+        data=[
+            {
+                "contact_id": "ct-john-carter",
+                "full_name": "John Carter",
+                "bank_name": "Northstar Bank",
+                "account_reference_masked": "···· 1042",
+                "currency": "EUR",
+                "status": "ACTIVE",
+            },
+            {
+                "contact_id": "ct-john-mitchell",
+                "full_name": "John Mitchell",
+                "bank_name": "Union Financial",
+                "account_reference_masked": "···· 2781",
+                "currency": "EUR",
+                "status": "ACTIVE",
+            },
+        ],
+        trace_id="contacts-test",
+    )
+    searched = ToolMessage(
+        name="search_contacts", tool_call_id="search-john", content=json.dumps(result)
+    )
+    state = {
+        "messages": [request, validated, searched],
+        "copilotkit": {
+            "context": [
+                {
+                    "description": "Current ORAIflow workspace and account selection",
+                    "value": context,
+                }
+            ],
+            "actions": [{"name": "prepare_transfer_draft"}],
+        },
+    }
 
     clarification = _handle_transfer_workflow(state, context)
     assert "John Carter" in clarification.content and "John Mitchell" in clarification.content
@@ -625,15 +895,44 @@ def test_production_transfer_continues_carter_then_everyday_and_opens_once():
     account_read = _handle_transfer_workflow(state, context)
     assert account_read.tool_calls[0]["name"] == "list_customer_accounts"
     state["messages"].append(account_read)
-    verified_accounts = create_result_envelope("banking.accounts.list", "SUCCESS", data=[
-        {"account_id": "acc-001", "account_name": "Everyday account", "account_type": "CURRENT", "currency": "EUR", "balance_minor": 2013080, "status": "ACTIVE"},
-        {"account_id": "acc-002", "account_name": "Savings account", "account_type": "SAVINGS", "currency": "EUR", "balance_minor": 860000, "status": "ACTIVE"},
-        {"account_id": "acc-003", "account_name": "Travel wallet", "account_type": "CURRENT", "currency": "EUR", "balance_minor": 248750, "status": "ACTIVE"},
-    ], trace_id="accounts-verify-everyday")
-    state["messages"].append(ToolMessage(
-        name="list_customer_accounts", tool_call_id=account_read.tool_calls[0]["id"],
-        content=json.dumps(verified_accounts),
-    ))
+    verified_accounts = create_result_envelope(
+        "banking.accounts.list",
+        "SUCCESS",
+        data=[
+            {
+                "account_id": "acc-001",
+                "account_name": "Everyday account",
+                "account_type": "CURRENT",
+                "currency": "EUR",
+                "balance_minor": 2013080,
+                "status": "ACTIVE",
+            },
+            {
+                "account_id": "acc-002",
+                "account_name": "Savings account",
+                "account_type": "SAVINGS",
+                "currency": "EUR",
+                "balance_minor": 860000,
+                "status": "ACTIVE",
+            },
+            {
+                "account_id": "acc-003",
+                "account_name": "Travel wallet",
+                "account_type": "CURRENT",
+                "currency": "EUR",
+                "balance_minor": 248750,
+                "status": "ACTIVE",
+            },
+        ],
+        trace_id="accounts-verify-everyday",
+    )
+    state["messages"].append(
+        ToolMessage(
+            name="list_customer_accounts",
+            tool_call_id=account_read.tool_calls[0]["id"],
+            content=json.dumps(verified_accounts),
+        )
+    )
     open_draft = _handle_transfer_workflow(state, context)
     assert open_draft.tool_calls[0]["name"] == "prepare_transfer_draft"
     args = open_draft.tool_calls[0]["args"]
@@ -643,15 +942,25 @@ def test_production_transfer_continues_carter_then_everyday_and_opens_once():
     assert args["workflow_id"] and args["action_id"]
 
     draft_result = create_result_envelope(
-        "frontend.transfer.prepare_draft", "SUCCESS",
-        data={"status": "draft_opened", "workflow_id": args["workflow_id"], "action_id": args["action_id"]},
+        "frontend.transfer.prepare_draft",
+        "SUCCESS",
+        data={
+            "status": "draft_opened",
+            "workflow_id": args["workflow_id"],
+            "action_id": args["action_id"],
+        },
         trace_id="draft-test",
     )
-    draft_tool_message = ToolMessage(name="prepare_transfer_draft", tool_call_id=args["action_id"], content=json.dumps(draft_result))
+    draft_tool_message = ToolMessage(
+        name="prepare_transfer_draft",
+        tool_call_id=args["action_id"],
+        content=json.dumps(draft_result),
+    )
     state["messages"].extend([open_draft, draft_tool_message])
     opened = _handle_transfer_workflow(state, context)
     assert "editable transfer draft is open" in opened.content.lower()
     from shared.pending_task import pending_task_from_message
+
     completed_task = pending_task_from_message(opened)
     assert completed_task is not None
     assert completed_task.status == "COMPLETED"
@@ -668,19 +977,56 @@ def test_production_transfer_highest_amount_reply_schedules_verified_balance_rea
     context = _agent_test_context()
     request = HumanMessage(content="send 50 EUR to John")
     contact_assessment = _transfer_assessment("John", "50", "send 50 EUR to John")
-    proposed = AIMessage(content="", tool_calls=[{
-        "name": "search_contacts",
-        "args": {"name_query": "John", "interpretation_assessment": contact_assessment},
-        "id": "search-john",
-        "type": "tool_call",
-    }])
+    proposed = AIMessage(
+        content="",
+        tool_calls=[
+            {
+                "name": "search_contacts",
+                "args": {"name_query": "John", "interpretation_assessment": contact_assessment},
+                "id": "search-john",
+                "type": "tool_call",
+            }
+        ],
+    )
     validated = _validate_proposed_tool_calls(proposed, [request], context)
-    contact_result = create_result_envelope("banking.contacts.search", "SUCCESS", data=[
-        {"contact_id": "ct-john-carter", "full_name": "John Carter", "bank_name": "Northstar Bank", "account_reference_masked": "···· 1042", "currency": "EUR", "status": "ACTIVE"},
-        {"contact_id": "ct-john-mitchell", "full_name": "John Mitchell", "bank_name": "Union Financial", "account_reference_masked": "···· 2781", "currency": "EUR", "status": "ACTIVE"},
-    ], trace_id="contacts-john")
-    contact_message = ToolMessage(name="search_contacts", tool_call_id="search-john", content=json.dumps(contact_result))
-    state = {"messages": [request, validated, contact_message], "copilotkit": {"context": [{"description": "Current ORAIflow workspace and account selection", "value": context}], "actions": [{"name": "prepare_transfer_draft"}]}}
+    contact_result = create_result_envelope(
+        "banking.contacts.search",
+        "SUCCESS",
+        data=[
+            {
+                "contact_id": "ct-john-carter",
+                "full_name": "John Carter",
+                "bank_name": "Northstar Bank",
+                "account_reference_masked": "···· 1042",
+                "currency": "EUR",
+                "status": "ACTIVE",
+            },
+            {
+                "contact_id": "ct-john-mitchell",
+                "full_name": "John Mitchell",
+                "bank_name": "Union Financial",
+                "account_reference_masked": "···· 2781",
+                "currency": "EUR",
+                "status": "ACTIVE",
+            },
+        ],
+        trace_id="contacts-john",
+    )
+    contact_message = ToolMessage(
+        name="search_contacts", tool_call_id="search-john", content=json.dumps(contact_result)
+    )
+    state = {
+        "messages": [request, validated, contact_message],
+        "copilotkit": {
+            "context": [
+                {
+                    "description": "Current ORAIflow workspace and account selection",
+                    "value": context,
+                }
+            ],
+            "actions": [{"name": "prepare_transfer_draft"}],
+        },
+    }
     ask_contact = _handle_transfer_workflow(state, context)
     assert "John Carter" in ask_contact.content and "John Mitchell" in ask_contact.content
     state["messages"].append(ask_contact)
@@ -700,16 +1046,48 @@ def test_production_transfer_highest_amount_reply_schedules_verified_balance_rea
     account_read = _handle_transfer_workflow(state, context)
     assert account_read.tool_calls[0]["name"] == "list_customer_accounts"
     assert account_read.tool_calls[0]["args"] == {}
-    assert account_read.additional_kwargs["oraiflow_runtime_owned_read_ids"] == [account_read.tool_calls[0]["id"]]
+    assert account_read.additional_kwargs["oraiflow_runtime_owned_read_ids"] == [
+        account_read.tool_calls[0]["id"]
+    ]
     assert workflow_from_message(account_read)["source_account_preference"] == "highest_balance"
     state["messages"].append(account_read)
 
-    verified_result = create_result_envelope("banking.accounts.list", "SUCCESS", data=[
-        {"account_id": "acc-001", "account_name": "Everyday account", "account_type": "CURRENT", "currency": "EUR", "balance_minor": 2013080, "status": "ACTIVE"},
-        {"account_id": "acc-002", "account_name": "Savings account", "account_type": "SAVINGS", "currency": "EUR", "balance_minor": 860000, "status": "ACTIVE"},
-        {"account_id": "acc-003", "account_name": "Travel wallet", "account_type": "CURRENT", "currency": "EUR", "balance_minor": 248750, "status": "ACTIVE"},
-    ], trace_id="accounts-ranked")
-    account_result = ToolMessage(name="list_customer_accounts", tool_call_id=account_read.tool_calls[0]["id"], content=json.dumps(verified_result))
+    verified_result = create_result_envelope(
+        "banking.accounts.list",
+        "SUCCESS",
+        data=[
+            {
+                "account_id": "acc-001",
+                "account_name": "Everyday account",
+                "account_type": "CURRENT",
+                "currency": "EUR",
+                "balance_minor": 2013080,
+                "status": "ACTIVE",
+            },
+            {
+                "account_id": "acc-002",
+                "account_name": "Savings account",
+                "account_type": "SAVINGS",
+                "currency": "EUR",
+                "balance_minor": 860000,
+                "status": "ACTIVE",
+            },
+            {
+                "account_id": "acc-003",
+                "account_name": "Travel wallet",
+                "account_type": "CURRENT",
+                "currency": "EUR",
+                "balance_minor": 248750,
+                "status": "ACTIVE",
+            },
+        ],
+        trace_id="accounts-ranked",
+    )
+    account_result = ToolMessage(
+        name="list_customer_accounts",
+        tool_call_id=account_read.tool_calls[0]["id"],
+        content=json.dumps(verified_result),
+    )
     state["messages"].append(account_result)
 
     open_draft = _handle_transfer_workflow(state, context)
@@ -724,21 +1102,38 @@ def test_agent_assisted_frontend_action_requires_assessment_then_strips_wrapper(
     context = _agent_test_context()
     current_turn = "Select my Savings account"
     assessment = {
-        "intent_id": "ACCOUNT_SELECTION", "intent_confidence": 0.97,
-        "slot_confidence": 0.96, "entity_confidence": 0.98,
-        "capability_id": "frontend.account.select", "capability_selection_confidence": 0.95,
-        "resolution": "READY", "slots": {"account_id": "acc-002"}, "entities": {},
+        "intent_id": "ACCOUNT_SELECTION",
+        "intent_confidence": 0.97,
+        "slot_confidence": 0.96,
+        "entity_confidence": 0.98,
+        "capability_id": "frontend.account.select",
+        "capability_selection_confidence": 0.95,
+        "resolution": "READY",
+        "slots": {"account_id": "acc-002"},
+        "entities": {},
         "evidence": [
             {"field": "intent", "source": "current_turn", "quote": current_turn},
-            {"field": "account_id", "source": "application_context", "quote": '"account_id": "acc-002"'},
+            {
+                "field": "account_id",
+                "source": "application_context",
+                "quote": '"account_id": "acc-002"',
+            },
         ],
     }
-    response = AIMessage(content="", tool_calls=[{
-        "name": "select_account",
-        "args": {"account_id": "acc-002", "interpretation_assessment": assessment},
-        "id": "select-savings", "type": "tool_call",
-    }])
-    validated = _validate_proposed_tool_calls(response, [HumanMessage(content=current_turn)], context)
+    response = AIMessage(
+        content="",
+        tool_calls=[
+            {
+                "name": "select_account",
+                "args": {"account_id": "acc-002", "interpretation_assessment": assessment},
+                "id": "select-savings",
+                "type": "tool_call",
+            }
+        ],
+    )
+    validated = _validate_proposed_tool_calls(
+        response, [HumanMessage(content=current_turn)], context
+    )
     assert validated.tool_calls[0]["args"] == {"account_id": "acc-002"}
 
 
@@ -757,11 +1152,18 @@ def test_show_contacts_routes_to_the_registered_contacts_workspace():
 
 def test_successful_workspace_navigation_receipt_gets_a_matching_customer_acknowledgement():
     receipt = create_result_envelope(
-        "frontend.workspace.navigate", "SUCCESS",
+        "frontend.workspace.navigate",
+        "SUCCESS",
         data={"status": "opened", "workspace": "Controls & audit"},
         trace_id="nav-ack-test",
     )
-    state = {"messages": [ToolMessage(name="navigate_workspace", tool_call_id="nav-call-1", content=json.dumps(receipt))]}
+    state = {
+        "messages": [
+            ToolMessage(
+                name="navigate_workspace", tool_call_id="nav-call-1", content=json.dumps(receipt)
+            )
+        ]
+    }
     message = _frontend_action_acknowledgement(state)
     assert message is not None
     assert message.content == "I've opened the Controls & audit workspace for you."
@@ -770,11 +1172,22 @@ def test_successful_workspace_navigation_receipt_gets_a_matching_customer_acknow
 
 def test_rejected_workspace_navigation_never_gets_a_false_success_message():
     receipt = create_result_envelope(
-        "frontend.workspace.navigate", "REJECTED",
-        error={"code": "WORKSPACE_NOT_AVAILABLE", "retryable": False, "message": "The application rejected this workspace."},
+        "frontend.workspace.navigate",
+        "REJECTED",
+        error={
+            "code": "WORKSPACE_NOT_AVAILABLE",
+            "retryable": False,
+            "message": "The application rejected this workspace.",
+        },
         trace_id="nav-ack-reject-test",
     )
-    state = {"messages": [ToolMessage(name="navigate_workspace", tool_call_id="nav-call-2", content=json.dumps(receipt))]}
+    state = {
+        "messages": [
+            ToolMessage(
+                name="navigate_workspace", tool_call_id="nav-call-2", content=json.dumps(receipt)
+            )
+        ]
+    }
     message = _frontend_action_acknowledgement(state)
     assert message is not None
     assert "rejected" in message.content.casefold() or "couldn't" in message.content.casefold()
@@ -833,14 +1246,21 @@ def test_academy_general_credit_score_question_does_not_schedule_personal_snapsh
 def test_unrelated_salary_question_does_not_inherit_a_pending_transfer_clarification():
     prior = AIMessage(
         content="Please provide the missing recipient.",
-        additional_kwargs={"oraiflow_task_plan": {"schema_version": "1.0.0", "tasks": [{
-            "task_id": "transfer-pending-1",
-            "intent_id": "TRANSFER_PREPARATION",
-            "status_hint": "CLARIFICATION_REQUIRED",
-            "reason_code": "VALUE_EVIDENCE_MISSING",
-            "missing_fields": ["beneficiary"],
-            "requested_outcome": "ACTION",
-        }]}},
+        additional_kwargs={
+            "oraiflow_task_plan": {
+                "schema_version": "1.0.0",
+                "tasks": [
+                    {
+                        "task_id": "transfer-pending-1",
+                        "intent_id": "TRANSFER_PREPARATION",
+                        "status_hint": "CLARIFICATION_REQUIRED",
+                        "reason_code": "VALUE_EVIDENCE_MISSING",
+                        "missing_fields": ["beneficiary"],
+                        "requested_outcome": "ACTION",
+                    }
+                ],
+            }
+        },
     )
     salary_question = HumanMessage(content="What was my recent salary?")
     assert _pending_semantic_tasks([prior, salary_question], salary_question.content) == []
@@ -849,14 +1269,21 @@ def test_unrelated_salary_question_does_not_inherit_a_pending_transfer_clarifica
 def test_short_answer_and_explicit_followup_marker_preserve_pending_task_context():
     prior = AIMessage(
         content="Which month did you mean?",
-        additional_kwargs={"oraiflow_task_plan": {"schema_version": "1.0.0", "tasks": [{
-            "task_id": "analysis-pending-1",
-            "intent_id": "TRANSACTION_ANALYSIS",
-            "status_hint": "CLARIFICATION_REQUIRED",
-            "reason_code": "VALUE_EVIDENCE_MISSING",
-            "missing_fields": ["period"],
-            "requested_outcome": "INFORMATION",
-        }]}},
+        additional_kwargs={
+            "oraiflow_task_plan": {
+                "schema_version": "1.0.0",
+                "tasks": [
+                    {
+                        "task_id": "analysis-pending-1",
+                        "intent_id": "TRANSACTION_ANALYSIS",
+                        "status_hint": "CLARIFICATION_REQUIRED",
+                        "reason_code": "VALUE_EVIDENCE_MISSING",
+                        "missing_fields": ["period"],
+                        "requested_outcome": "INFORMATION",
+                    }
+                ],
+            }
+        },
     )
     for answer in ("November", "November 2025", "What about November?"):
         current = HumanMessage(content=answer)

@@ -4,6 +4,7 @@ The model may describe customer intent, slots, entities and source quotations.
 It cannot select or invoke an executable capability. The runtime maps each
 validated intent to its canonical OCCF execution plan.
 """
+
 from __future__ import annotations
 
 import json
@@ -20,12 +21,23 @@ class TaskEvidence(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    field: str = Field(min_length=1, max_length=80, description="The exact registered slot/entity field supported by this quotation, or 'intent' for task selection.")
+    field: str = Field(
+        min_length=1,
+        max_length=80,
+        description="The exact registered slot/entity field supported by this quotation, or 'intent' for task selection.",
+    )
     source: Literal[
-        "current_turn", "conversation", "assistant_context",
-        "application_context", "capability_result",
+        "current_turn",
+        "conversation",
+        "assistant_context",
+        "application_context",
+        "capability_result",
     ]
-    quote: str = Field(min_length=1, max_length=500, description="A short exact quotation from the current turn, prior customer message, or supplied validated context. Never paraphrase evidence.")
+    quote: str = Field(
+        min_length=1,
+        max_length=500,
+        description="A short exact quotation from the current turn, prior customer message, or supplied validated context. Never paraphrase evidence.",
+    )
 
 
 class InterpretedTask(BaseModel):
@@ -33,19 +45,64 @@ class InterpretedTask(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    intent_id: str = Field(min_length=1, max_length=80, description="One exact intent_id from the registered ORAIflow decision map; never a capability or tool name.")
+    intent_id: str = Field(
+        min_length=1,
+        max_length=80,
+        description="One exact intent_id from the registered ORAIflow decision map; never a capability or tool name.",
+    )
     requested_outcome: Literal[
         "INFORMATION", "EXPLANATION", "EDUCATION", "NAVIGATION", "ACTION", "UNKNOWN"
-    ] = Field(default="INFORMATION", description="What the customer wants: information, explanation, education, navigation, or an action workflow.")
-    resolution: Literal["READY", "NEEDS_CLARIFICATION", "ABSTAIN"] = Field(default="READY", description="Your provisional assessment only. The planner decides whether OCCF defaults and required inputs make the contract executable.")
-    slots: dict[str, str] = Field(default_factory=dict, max_length=40, description="Registered intent input fields and customer-supported scalar values. Keep scope, selectors, amount, currency and source-account choice distinct.")
-    entities: dict[str, str] = Field(default_factory=dict, max_length=40, description="Named people, accounts, workspaces, resources or other registered entities; do not put them into unrelated preference fields.")
-    evidence: list[TaskEvidence] = Field(default_factory=list, max_length=40, description="Field-specific exact source quotations for every proposed slot/entity and for the intent.")
-    intent_confidence: float | None = Field(default=None, ge=0, le=1, description="Confidence that this registered intent matches the customer's goal.")
-    slot_confidence: float | None = Field(default=None, ge=0, le=1, description="Confidence in the extracted slot values; null when no slots are proposed.")
-    entity_confidence: float | None = Field(default=None, ge=0, le=1, description="Confidence in the extracted entities; null when no entities are proposed.")
-    clarification_question: str | None = Field(default=None, max_length=500, description="Ask only for genuinely required information absent from the conversation and validated application context.")
-    conversation_references: list[str] = Field(default_factory=list, max_length=10, description="Exact prior message IDs referenced by this task, when needed.")
+    ] = Field(
+        default="INFORMATION",
+        description="What the customer wants: information, explanation, education, navigation, or an action workflow.",
+    )
+    resolution: Literal["READY", "NEEDS_CLARIFICATION", "ABSTAIN"] = Field(
+        default="READY",
+        description="Your provisional assessment only. The planner decides whether OCCF defaults and required inputs make the contract executable.",
+    )
+    slots: dict[str, str] = Field(
+        default_factory=dict,
+        max_length=40,
+        description="Registered intent input fields and customer-supported scalar values. Keep scope, selectors, amount, currency and source-account choice distinct.",
+    )
+    entities: dict[str, str] = Field(
+        default_factory=dict,
+        max_length=40,
+        description="Named people, accounts, workspaces, resources or other registered entities; do not put them into unrelated preference fields.",
+    )
+    evidence: list[TaskEvidence] = Field(
+        default_factory=list,
+        max_length=40,
+        description="Field-specific exact source quotations for every proposed slot/entity and for the intent.",
+    )
+    intent_confidence: float | None = Field(
+        default=None,
+        ge=0,
+        le=1,
+        description="Confidence that this registered intent matches the customer's goal.",
+    )
+    slot_confidence: float | None = Field(
+        default=None,
+        ge=0,
+        le=1,
+        description="Confidence in the extracted slot values; null when no slots are proposed.",
+    )
+    entity_confidence: float | None = Field(
+        default=None,
+        ge=0,
+        le=1,
+        description="Confidence in the extracted entities; null when no entities are proposed.",
+    )
+    clarification_question: str | None = Field(
+        default=None,
+        max_length=500,
+        description="Ask only for genuinely required information absent from the conversation and validated application context.",
+    )
+    conversation_references: list[str] = Field(
+        default_factory=list,
+        max_length=10,
+        description="Exact prior message IDs referenced by this task, when needed.",
+    )
 
 
 class TurnInterpretationAssessment(BaseModel):
@@ -68,7 +125,6 @@ class AssessmentToolArguments(TurnInterpretationAssessment):
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
-
 
 
 def parse_assessment_json(raw: Any) -> tuple[TurnInterpretationAssessment | None, dict[str, Any]]:
@@ -105,7 +161,9 @@ def parse_assessment_json(raw: Any) -> tuple[TurnInterpretationAssessment | None
                         normalized = {}
                         for key, value in values.items():
                             if isinstance(value, bool) or not isinstance(value, (str, int, float)):
-                                raise ValueError(f"{field_name}.{key} must be a scalar string/number")
+                                raise ValueError(
+                                    f"{field_name}.{key} must be a scalar string/number"
+                                )
                             normalized[str(key)] = str(value)
                         item[field_name] = normalized
                 normalized_tasks.append(item)
@@ -119,7 +177,11 @@ def parse_assessment_json(raw: Any) -> tuple[TurnInterpretationAssessment | None
                 f"{'.'.join(str(part) for part in error.get('loc', ())) or 'assessment'}:{error.get('type', 'invalid')}"
                 for error in exc.errors(include_url=False)[:12]
             ]
-        return None, {"code": "ASSESSMENT_SCHEMA_INVALID", "detail_type": type(exc).__name__, "issues": details}
+        return None, {
+            "code": "ASSESSMENT_SCHEMA_INVALID",
+            "detail_type": type(exc).__name__,
+            "issues": details,
+        }
     if assessment.resolution == "RESOLVED" and not assessment.tasks:
         return None, {"code": "ASSESSMENT_EMPTY_TASKS", "detail_type": "empty_resolved_assessment"}
     return assessment, {"code": "ASSESSMENT_VALID", "task_count": len(assessment.tasks)}
@@ -211,7 +273,9 @@ def repair_registered_semantic_evidence(
                         repaired_fields.append(field_name)
                     slots[field_name] = matched_value
                     evidence = [item for item in evidence if item.field != field_name]
-                    evidence.append(TaskEvidence(field=field_name, source="current_turn", quote=quote))
+                    evidence.append(
+                        TaskEvidence(field=field_name, source="current_turn", quote=quote)
+                    )
                 continue
 
             # An explicit but unsupported selector must not silently become a
@@ -225,10 +289,13 @@ def repair_registered_semantic_evidence(
             # apply the registered default after evidence validation.
             field_evidence = [item for item in evidence if item.field == field_name]
             customer_evidence = [
-                item for item in field_evidence
-                if item.source in {"current_turn", "conversation"}
+                item for item in field_evidence if item.source in {"current_turn", "conversation"}
             ]
-            if not customer_evidence and spec.get("required") is not True and spec.get("default_policy") == "when_unspecified":
+            if (
+                not customer_evidence
+                and spec.get("required") is not True
+                and spec.get("default_policy") == "when_unspecified"
+            ):
                 slots.pop(field_name, None)
                 evidence = [item for item in evidence if item.field != field_name]
                 defaulted_fields.append(field_name)
@@ -246,9 +313,15 @@ def repair_registered_semantic_evidence(
                 ):
                     repaired_fields.append(field_name)
 
-        repaired_tasks.append(task.model_copy(update={
-            "slots": slots, "entities": entities, "evidence": evidence,
-        }))
+        repaired_tasks.append(
+            task.model_copy(
+                update={
+                    "slots": slots,
+                    "entities": entities,
+                    "evidence": evidence,
+                }
+            )
+        )
 
     updated = assessment.model_copy(update={"tasks": repaired_tasks})
     return updated, {
@@ -291,7 +364,11 @@ def safe_customer_clarification(
             "outcome you're looking for? I haven't retrieved or changed anything."
         )
     value = str(clarification_message or "").strip()
-    return value[:500] if value else "Could you clarify what you would like to understand or do in ORAIflow?"
+    return (
+        value[:500]
+        if value
+        else "Could you clarify what you would like to understand or do in ORAIflow?"
+    )
 
 
 def missing_task_field_evidence(assessment: TurnInterpretationAssessment) -> list[dict[str, Any]]:
@@ -310,12 +387,16 @@ def missing_task_field_evidence(assessment: TurnInterpretationAssessment) -> lis
     return missing
 
 
-def parse_assessment_payload(raw: Any) -> tuple[TurnInterpretationAssessment | None, dict[str, Any]]:
+def parse_assessment_payload(
+    raw: Any,
+) -> tuple[TurnInterpretationAssessment | None, dict[str, Any]]:
     """Preferred provider-boundary parser; retained name clarifies direct payloads."""
     return parse_assessment_json(raw)
 
 
-def intent_validation_capability(intent_id: str, registry: dict[str, Any] | None = None) -> str | None:
+def intent_validation_capability(
+    intent_id: str, registry: dict[str, Any] | None = None
+) -> str | None:
     """Choose a validation relationship from OCCF; never accept one from the model."""
     registry = registry or get_registry()
     intent = registry.get("intents", {}).get(intent_id)
@@ -342,7 +423,6 @@ def intent_validation_capability(intent_id: str, registry: dict[str, Any] | None
     return None
 
 
-
 def bind_structured_assessment_model(model: Any) -> tuple[Any, str]:
     """Prefer the provider's native Pydantic structured-output adapter.
 
@@ -363,7 +443,9 @@ def bind_structured_assessment_model(model: Any) -> tuple[Any, str]:
         return method(AssessmentToolArguments, method="json_schema"), "native_json_schema"
 
 
-def bind_required_assessment_model(model: Any, assessment_tool: Any, provider: str) -> tuple[Any, str]:
+def bind_required_assessment_model(
+    model: Any, assessment_tool: Any, provider: str
+) -> tuple[Any, str]:
     """Bind the assessment channel in the provider's required-tool mode where supported.
 
     Anthropic calls its forced tool mode ``any``; OpenAI-compatible and Ollama
@@ -403,7 +485,9 @@ def safe_explicit_transfer_assessment(
     from shared.contact_resolution import extract_contact_transfer_request
 
     parsed = extract_contact_transfer_request(
-        current_text, context or {}, allow_currency_missing=True,
+        current_text,
+        context or {},
+        allow_currency_missing=True,
     )
     if not parsed:
         return None
@@ -427,17 +511,19 @@ def safe_explicit_transfer_assessment(
         evidence.append(TaskEvidence(field="currency", source="current_turn", quote=currency))
     return TurnInterpretationAssessment(
         resolution="RESOLVED",
-        tasks=[InterpretedTask(
-            intent_id="TRANSFER_PREPARATION",
-            requested_outcome="ACTION",
-            resolution="READY",
-            slots=slots,
-            entities={"beneficiary": beneficiary},
-            evidence=evidence,
-            intent_confidence=0.98,
-            slot_confidence=0.98,
-            entity_confidence=0.98,
-        )],
+        tasks=[
+            InterpretedTask(
+                intent_id="TRANSFER_PREPARATION",
+                requested_outcome="ACTION",
+                resolution="READY",
+                slots=slots,
+                entities={"beneficiary": beneficiary},
+                evidence=evidence,
+                intent_confidence=0.98,
+                slot_confidence=0.98,
+                entity_confidence=0.98,
+            )
+        ],
     )
 
 
@@ -487,7 +573,9 @@ def safe_canonical_read_assessment(
         if plan.get("required_slots") or plan.get("required_entities"):
             continue
         capability_id = intent_validation_capability(intent_id, registry)
-        capability = registry.get("capabilities", {}).get(capability_id, {}) if capability_id else {}
+        capability = (
+            registry.get("capabilities", {}).get(capability_id, {}) if capability_id else {}
+        )
         if capability.get("kind") != "mcp":
             continue
         if capability.get("authorization", {}).get("agent_invocable") is not True:
@@ -511,17 +599,25 @@ def safe_canonical_read_assessment(
     requested_outcome = "EXPLANATION" if response_mode == "grounded_explanation" else "INFORMATION"
     return TurnInterpretationAssessment(
         resolution="RESOLVED",
-        tasks=[InterpretedTask(
-            intent_id=str(candidate["intent_id"]),
-            requested_outcome=requested_outcome,
-            resolution="READY",
-            evidence=[TaskEvidence(field="intent", source="current_turn", quote=str(current_text)[:500])],
-            intent_confidence=0.97,
-        )],
+        tasks=[
+            InterpretedTask(
+                intent_id=str(candidate["intent_id"]),
+                requested_outcome=requested_outcome,
+                resolution="READY",
+                evidence=[
+                    TaskEvidence(
+                        field="intent", source="current_turn", quote=str(current_text)[:500]
+                    )
+                ],
+                intent_confidence=0.97,
+            )
+        ],
     )
 
 
-def task_capability_plan(intent_id: str, registry: dict[str, Any] | None = None) -> dict[str, Any] | None:
+def task_capability_plan(
+    intent_id: str, registry: dict[str, Any] | None = None
+) -> dict[str, Any] | None:
     """Return the registered plan for an intent, excluding model-supplied routing."""
     registry = registry or get_registry()
     intent = registry.get("intents", {}).get(intent_id)
@@ -534,13 +630,17 @@ def task_capability_plan(intent_id: str, registry: dict[str, Any] | None = None)
     return {
         "intent_id": intent_id,
         "capability_id": capability_id,
-        "capability": registry.get("capabilities", {}).get(capability_id, {}) if capability_id else {},
+        "capability": (
+            registry.get("capabilities", {}).get(capability_id, {}) if capability_id else {}
+        ),
         "execution_plan": plan,
         "description": str(intent.get("description", "")),
     }
 
 
-def allowed_conversation_references(task: InterpretedTask, messages: list[Any] | tuple[Any, ...]) -> bool:
+def allowed_conversation_references(
+    task: InterpretedTask, messages: list[Any] | tuple[Any, ...]
+) -> bool:
     """References must resolve to message IDs in the supplied conversation."""
     known = {
         str(getattr(message, "id", ""))
@@ -562,70 +662,117 @@ def task_prompt_catalogue(registry: dict[str, Any] | None = None) -> list[dict[s
     for intent_id, intent in registry.get("intents", {}).items():
         if not isinstance(intent, dict):
             continue
-        plan = intent.get("execution_plan", {}) if isinstance(intent.get("execution_plan"), dict) else {}
-        discovery = intent.get("semantic_discovery", {}) if isinstance(intent.get("semantic_discovery"), dict) else {}
+        plan = (
+            intent.get("execution_plan", {})
+            if isinstance(intent.get("execution_plan"), dict)
+            else {}
+        )
+        discovery = (
+            intent.get("semantic_discovery", {})
+            if isinstance(intent.get("semantic_discovery"), dict)
+            else {}
+        )
         phrases = discovery.get("phrases", discovery.get("examples", []))
         keywords = discovery.get("keywords", [])
-        recognition = intent.get("recognition", {}) if isinstance(intent.get("recognition"), dict) else {}
-        aliases = recognition.get("aliases", []) if isinstance(recognition.get("aliases"), list) else []
-        catalogue.append({
-            "intent_id": str(intent_id),
-            "description": str(intent.get("description", ""))[:420],
-            "response_mode": str(plan.get("response_mode") or ("presentation" if plan.get("presentation") else "read")),
-            "resource_id": str(plan.get("resource_id", "")) or None,
-            "examples": [str(value)[:120] for value in phrases[:8]] if isinstance(phrases, list) else [],
-            "keywords": [str(value)[:80] for value in keywords[:12]] if isinstance(keywords, list) else [],
-            "required_slots": [str(value) for value in plan.get("required_slots", []) if isinstance(value, str)],
-            "optional_slots": [str(value) for value in plan.get("optional_slots", []) if isinstance(value, str)],
-            "slot_descriptions": {
-                str(key): str(value)[:180]
-                for key, value in plan.get("slot_descriptions", {}).items()
-                if isinstance(key, str) and isinstance(value, str)
-            },
-            "slot_values": {
-                str(key): [str(value) for value in values]
-                for key, values in plan.get("slot_values", {}).items()
-                if isinstance(key, str) and isinstance(values, list)
-            },
-            "required_entities": [str(value) for value in plan.get("required_entities", []) if isinstance(value, str)],
-            "entity_descriptions": {
-                str(key): str(value)[:220]
-                for key, value in plan.get("entity_descriptions", {}).items()
-                if isinstance(key, str) and isinstance(value, str)
-            },
-            "requires_unique_contact": bool(plan.get("requires_unique_contact")),
-            "aliases": [str(value)[:80] for value in aliases[:8]],
-            # Publish semantic meaning to the interpreter, not backend
-            # argument mappings or capability schemas. The planner retains
-            # those execution details and compiles them after interpretation.
-            "semantic_inputs": {
-                str(field_name): {
-                    "location": str(spec.get("location", "slots")),
-                    "description": str(spec.get("description", ""))[:190],
-                    "allowed_values": [str(value) for value in spec.get("allowed_values", []) if isinstance(value, str)],
-                    "default": str(spec["default"]) if spec.get("default") is not None else None,
-                    "default_policy": str(spec.get("default_policy")) if spec.get("default_policy") is not None else None,
-                    "conditional_defaults": [
-                        {
-                            "when": {str(key): str(value) for key, value in rule.get("when", {}).items()},
-                            "value": str(rule.get("value")),
-                            "description": str(rule.get("description", ""))[:180],
-                        }
-                        for rule in spec.get("conditional_defaults", [])
-                        if isinstance(rule, dict) and isinstance(rule.get("when"), dict)
-                    ],
-                    "required": bool(spec.get("required", False)),
-                }
-                for field_name, spec in plan.get("semantic_inputs", {}).items()
-                if isinstance(field_name, str) and isinstance(spec, dict)
-            },
-            "outcome_semantics": str(plan.get("outcome_semantics", ""))[:520],
-        })
+        recognition = (
+            intent.get("recognition", {}) if isinstance(intent.get("recognition"), dict) else {}
+        )
+        aliases = (
+            recognition.get("aliases", []) if isinstance(recognition.get("aliases"), list) else []
+        )
+        catalogue.append(
+            {
+                "intent_id": str(intent_id),
+                "description": str(intent.get("description", ""))[:420],
+                "response_mode": str(
+                    plan.get("response_mode")
+                    or ("presentation" if plan.get("presentation") else "read")
+                ),
+                "resource_id": str(plan.get("resource_id", "")) or None,
+                "examples": (
+                    [str(value)[:120] for value in phrases[:8]] if isinstance(phrases, list) else []
+                ),
+                "keywords": (
+                    [str(value)[:80] for value in keywords[:12]]
+                    if isinstance(keywords, list)
+                    else []
+                ),
+                "required_slots": [
+                    str(value) for value in plan.get("required_slots", []) if isinstance(value, str)
+                ],
+                "optional_slots": [
+                    str(value) for value in plan.get("optional_slots", []) if isinstance(value, str)
+                ],
+                "slot_descriptions": {
+                    str(key): str(value)[:180]
+                    for key, value in plan.get("slot_descriptions", {}).items()
+                    if isinstance(key, str) and isinstance(value, str)
+                },
+                "slot_values": {
+                    str(key): [str(value) for value in values]
+                    for key, values in plan.get("slot_values", {}).items()
+                    if isinstance(key, str) and isinstance(values, list)
+                },
+                "required_entities": [
+                    str(value)
+                    for value in plan.get("required_entities", [])
+                    if isinstance(value, str)
+                ],
+                "entity_descriptions": {
+                    str(key): str(value)[:220]
+                    for key, value in plan.get("entity_descriptions", {}).items()
+                    if isinstance(key, str) and isinstance(value, str)
+                },
+                "requires_unique_contact": bool(plan.get("requires_unique_contact")),
+                "aliases": [str(value)[:80] for value in aliases[:8]],
+                # Publish semantic meaning to the interpreter, not backend
+                # argument mappings or capability schemas. The planner retains
+                # those execution details and compiles them after interpretation.
+                "semantic_inputs": {
+                    str(field_name): {
+                        "location": str(spec.get("location", "slots")),
+                        "description": str(spec.get("description", ""))[:190],
+                        "allowed_values": [
+                            str(value)
+                            for value in spec.get("allowed_values", [])
+                            if isinstance(value, str)
+                        ],
+                        "default": (
+                            str(spec["default"]) if spec.get("default") is not None else None
+                        ),
+                        "default_policy": (
+                            str(spec.get("default_policy"))
+                            if spec.get("default_policy") is not None
+                            else None
+                        ),
+                        "conditional_defaults": [
+                            {
+                                "when": {
+                                    str(key): str(value)
+                                    for key, value in rule.get("when", {}).items()
+                                },
+                                "value": str(rule.get("value")),
+                                "description": str(rule.get("description", ""))[:180],
+                            }
+                            for rule in spec.get("conditional_defaults", [])
+                            if isinstance(rule, dict) and isinstance(rule.get("when"), dict)
+                        ],
+                        "required": bool(spec.get("required", False)),
+                    }
+                    for field_name, spec in plan.get("semantic_inputs", {}).items()
+                    if isinstance(field_name, str) and isinstance(spec, dict)
+                },
+                "outcome_semantics": str(plan.get("outcome_semantics", ""))[:520],
+            }
+        )
     return catalogue
 
 
 def workspace_prompt_catalogue(
-    registry: dict[str, Any] | None = None, *, query: str = "", limit: int = 3,
+    registry: dict[str, Any] | None = None,
+    *,
+    query: str = "",
+    limit: int = 3,
 ) -> list[dict[str, Any]]:
     """Return turn-relevant descriptive workspace knowledge, never action schemas.
 
@@ -650,7 +797,15 @@ def workspace_prompt_catalogue(
             # A single generic product noun is not enough to infer a question
             # about the workspace itself. Preserve explicit plural aliases and
             # aliases that are clearly page/workspace labels.
-            if normalised_alias in {"account", "card", "payment", "transaction", "contact", "loan", "credit"}:
+            if normalised_alias in {
+                "account",
+                "card",
+                "payment",
+                "transaction",
+                "contact",
+                "loan",
+                "credit",
+            }:
                 framed = re.search(
                     rf"(?<![a-z0-9]){re.escape(normalised_alias)}\s+(?:tab|workspace|page|section)(?![a-z0-9])",
                     normalised_query,
@@ -660,23 +815,54 @@ def workspace_prompt_catalogue(
             matched_names.append(alias)
         if normalised_query and not matched_names:
             continue
-        result.append({
-            "workspace_id": str(workspace_id),
-            "aliases": names[:12],
-            "purpose": str(value.get("purpose", ""))[:300],
-            "value": str(value.get("value", ""))[:300],
-            "features": [str(item)[:140] for item in value.get("features", [])[:8]],
-            "limitations": [str(item)[:140] for item in value.get("limitations", [])[:4]],
-        })
-    return result[:max(1, int(limit))]
+        result.append(
+            {
+                "workspace_id": str(workspace_id),
+                "aliases": names[:12],
+                "purpose": str(value.get("purpose", ""))[:300],
+                "value": str(value.get("value", ""))[:300],
+                "features": [str(item)[:140] for item in value.get("features", [])[:8]],
+                "limitations": [str(item)[:140] for item in value.get("limitations", [])[:4]],
+            }
+        )
+    return result[: max(1, int(limit))]
 
 
 def _semantic_tokens(value: str) -> set[str]:
     """Normalize content words for lightweight catalogue relevance scoring."""
     stopwords = {
-        "a", "an", "and", "are", "as", "at", "be", "by", "can", "do", "does",
-        "for", "from", "how", "i", "in", "is", "it", "me", "my", "of", "on",
-        "or", "our", "please", "the", "to", "what", "when", "which", "with", "you",
+        "a",
+        "an",
+        "and",
+        "are",
+        "as",
+        "at",
+        "be",
+        "by",
+        "can",
+        "do",
+        "does",
+        "for",
+        "from",
+        "how",
+        "i",
+        "in",
+        "is",
+        "it",
+        "me",
+        "my",
+        "of",
+        "on",
+        "or",
+        "our",
+        "please",
+        "the",
+        "to",
+        "what",
+        "when",
+        "which",
+        "with",
+        "you",
     }
     tokens = set(re.sub(r"[^a-z0-9]+", " ", str(value).casefold()).split())
     # A small morphology normalization handles common plural forms without
@@ -691,7 +877,10 @@ def _semantic_tokens(value: str) -> set[str]:
 
 
 def academy_prompt_catalogue(
-    registry: dict[str, Any] | None = None, *, query: str = "", limit: int = 3,
+    registry: dict[str, Any] | None = None,
+    *,
+    query: str = "",
+    limit: int = 3,
 ) -> list[dict[str, Any]]:
     """Return stable, relevant maintained learning topics for the current turn.
 
@@ -724,22 +913,28 @@ def academy_prompt_catalogue(
         # short generic words such as "loan" or "debt" cannot pull in a topic
         # on their own. Multi-word exact concepts always score higher.
         token_score = (
-            len(token_matches) * 2 if len(token_matches) >= 2
-            else 3 if len(token_matches) == 1 and len(next(iter(token_matches))) >= 7
-            else 0
+            len(token_matches) * 2
+            if len(token_matches) >= 2
+            else 3 if len(token_matches) == 1 and len(next(iter(token_matches))) >= 7 else 0
         )
         score = max(exact_score, token_score)
         if score <= 0:
             continue
-        scored.append((score, -order, {
-            "topic_id": str(topic["topic_id"]),
-            "title": str(topic.get("title", ""))[:160],
-            "description": str(topic.get("description", ""))[:260],
-            "starter_prompt": str(topic.get("starter_prompt", ""))[:220],
-            "keywords": [str(item)[:80] for item in topic.get("keywords", [])[:12]],
-            "customer_explanation": str(topic.get("customer_explanation", ""))[:420],
-            "personal_data_required": bool(topic.get("personal_data_intent_id")),
-        }))
+        scored.append(
+            (
+                score,
+                -order,
+                {
+                    "topic_id": str(topic["topic_id"]),
+                    "title": str(topic.get("title", ""))[:160],
+                    "description": str(topic.get("description", ""))[:260],
+                    "starter_prompt": str(topic.get("starter_prompt", ""))[:220],
+                    "keywords": [str(item)[:80] for item in topic.get("keywords", [])[:12]],
+                    "customer_explanation": str(topic.get("customer_explanation", ""))[:420],
+                    "personal_data_required": bool(topic.get("personal_data_intent_id")),
+                },
+            )
+        )
     scored.sort(key=lambda item: (item[0], item[1]), reverse=True)
     if not scored:
         return []
@@ -748,14 +943,18 @@ def academy_prompt_catalogue(
     # concept is mentioned more often than another (credit score vs badge).
     exact_matches = [item for score, _order, item in scored if score >= 8]
     if exact_matches:
-        return exact_matches[:max(1, int(limit))]
+        return exact_matches[: max(1, int(limit))]
     best = scored[0][0]
-    return [item for score, _order, item in scored if score >= max(3, best - 1)][:max(1, int(limit))]
-
+    return [item for score, _order, item in scored if score >= max(3, best - 1)][
+        : max(1, int(limit))
+    ]
 
 
 def rank_saved_contacts_for_context(
-    contacts: list[dict[str, Any]] | None, customer_text: str, *, limit: int = 20,
+    contacts: list[dict[str, Any]] | None,
+    customer_text: str,
+    *,
+    limit: int = 20,
 ) -> list[dict[str, str]]:
     """Prioritize customer-named saved contacts in the read-only LLM context.
 
@@ -765,9 +964,28 @@ def rank_saved_contacts_for_context(
     and disclosure still occur through the authenticated contacts capability.
     """
     stop = {
-        "a", "an", "and", "are", "do", "find", "for", "from", "in", "is",
-        "look", "me", "my", "of", "please", "saved", "search", "the", "to",
-        "up", "contact", "contacts",
+        "a",
+        "an",
+        "and",
+        "are",
+        "do",
+        "find",
+        "for",
+        "from",
+        "in",
+        "is",
+        "look",
+        "me",
+        "my",
+        "of",
+        "please",
+        "saved",
+        "search",
+        "the",
+        "to",
+        "up",
+        "contact",
+        "contacts",
     }
     query = str(customer_text or "").casefold()
     query_tokens = {token for token in re.findall(r"[a-z0-9]+", query) if token not in stop}
@@ -782,17 +1000,24 @@ def rank_saved_contacts_for_context(
         overlap = len(query_tokens & name_tokens)
         exact_name = int(bool(name.casefold() and name.casefold() in query))
         score = exact_name * 100 + overlap * 10
-        ranked.append((score, index, {
-            "name": name[:160],
-            "status": str(item.get("status") or "ACTIVE")[:24],
-        }))
+        ranked.append(
+            (
+                score,
+                index,
+                {
+                    "name": name[:160],
+                    "status": str(item.get("status") or "ACTIVE")[:24],
+                },
+            )
+        )
     # Unrelated questions must not inherit an arbitrary prefix of the saved
     # contact catalogue. Besides wasting context tokens, this adds irrelevant
     # personal names to every interpretation request. Keep only contacts that
     # actually match words in the customer's current utterance.
     ranked = [item for item in ranked if item[0] > 0]
     ranked.sort(key=lambda value: (-value[0], value[1]))
-    return [item for _score, _index, item in ranked[:max(1, min(40, int(limit)))]]
+    return [item for _score, _index, item in ranked[: max(1, min(40, int(limit)))]]
+
 
 def normalise_task_payload(task: InterpretedTask) -> dict[str, Any]:
     """Convert the strict task to the established evidence-validation shape.
@@ -837,10 +1062,13 @@ def build_assessment_prompt(
     # interpretation model through this secondary prompt channel.
     prompt_candidates = [
         {
-            key: value for key, value in item.items()
-            if key not in {"capability_id", "capability_name", "tool_name", "arguments", "input_schema"}
+            key: value
+            for key, value in item.items()
+            if key
+            not in {"capability_id", "capability_name", "tool_name", "arguments", "input_schema"}
         }
-        for item in (intent_candidates or []) if isinstance(item, dict)
+        for item in (intent_candidates or [])
+        if isinstance(item, dict)
     ]
 
     prompt_decision_map = None
@@ -857,7 +1085,8 @@ def build_assessment_prompt(
         if isinstance(assistant_capabilities, list):
             prompt_resources["assistant_capabilities"] = [
                 {key: value for key, value in item.items() if key != "capability_id"}
-                for item in assistant_capabilities if isinstance(item, dict)
+                for item in assistant_capabilities
+                if isinstance(item, dict)
             ]
         prompt_decision_map["resources"] = prompt_resources
 
@@ -964,8 +1193,8 @@ def build_assessment_prompt(
             "\n\nAUTHORITATIVE ORAIflow DECISION MAP (use this once to understand the "
             "application's registered intent semantics, resources and workflow owners):\n"
             + _json.dumps(prompt_decision_map, ensure_ascii=False, separators=(",", ":"))
-            if prompt_decision_map is not None else
-            "\n\nREGISTERED INTENTS (semantic descriptions, phrases, keywords and required slots; "
+            if prompt_decision_map is not None
+            else "\n\nREGISTERED INTENTS (semantic descriptions, phrases, keywords and required slots; "
             "the runtime owns capability mapping):\n"
             + _json.dumps(catalogue, ensure_ascii=False, separators=(",", ":"))
             + "\n\nREGISTERED WORKSPACES (explanatory application knowledge, not actions):\n"

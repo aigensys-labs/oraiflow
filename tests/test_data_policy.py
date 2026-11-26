@@ -19,11 +19,13 @@ def test_preserves_non_sensitive_banking_text():
 
 
 def test_mcp_tool_output_is_labeled_untrusted_and_redacted():
-    raw = json.dumps({
-        "description": "Payment to CZ6508000000192000145399",
-        "amount_minor": -2500,
-        "currency": "EUR",
-    })
+    raw = json.dumps(
+        {
+            "description": "Payment to CZ6508000000192000145399",
+            "amount_minor": -2500,
+            "currency": "EUR",
+        }
+    )
     safe = sanitize_mcp_tool_output(raw)
     envelope = json.loads(safe)
     assert envelope["trust_class"] == "untrusted_banking_data"

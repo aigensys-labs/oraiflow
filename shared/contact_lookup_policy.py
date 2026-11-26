@@ -1,4 +1,5 @@
 """Turn-ownership policy for deterministic saved-contact response rendering."""
+
 from __future__ import annotations
 
 import re
@@ -27,9 +28,7 @@ def _latest_user_text(messages: list[Any]) -> str:
         return ""
     content = message_value(messages[index], "content", "")
     if isinstance(content, list):
-        content = " ".join(
-            str(item.get("text", "")) for item in content if isinstance(item, dict)
-        )
+        content = " ".join(str(item.get("text", "")) for item in content if isinstance(item, dict))
     return str(content or "").strip()
 
 
@@ -60,7 +59,8 @@ def _has_transfer_task_ownership(messages: list[Any]) -> bool:
     latest_human_index = _latest_user_index(messages)
     preceding_assistant = next(
         (
-            message for message in reversed(messages[:latest_human_index])
+            message
+            for message in reversed(messages[:latest_human_index])
             if message_type(message) == "ai"
         ),
         None,
@@ -96,7 +96,7 @@ def is_standalone_saved_contact_lookup(
     }
     current_turn_start = _latest_user_index(items)
     current_plan = None
-    for message in reversed(items[current_turn_start + 1:]):
+    for message in reversed(items[current_turn_start + 1 :]):
         if message_type(message) != "ai":
             continue
         plan = message_metadata(message).get("oraiflow_task_plan")

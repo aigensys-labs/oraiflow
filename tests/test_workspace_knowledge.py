@@ -17,7 +17,17 @@ def test_academy_about_question_is_answered_from_workspace_catalogue():
 def test_all_tabs_guide_is_assembled_from_registry_workspaces():
     answer = workspace_help_for_request("Can you guide me through all the tabs?")
     assert answer == workspace_catalogue_overview_message()
-    for name in ("Overview", "Accounts", "Payments", "Loans", "Cards", "Contacts", "Activity", "Academy", "Controls & audit"):
+    for name in (
+        "Overview",
+        "Accounts",
+        "Payments",
+        "Loans",
+        "Cards",
+        "Contacts",
+        "Activity",
+        "Academy",
+        "Controls & audit",
+    ):
         assert f"**{name}**" in answer
 
 

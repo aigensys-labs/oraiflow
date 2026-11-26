@@ -30,7 +30,6 @@ def test_account_delta_can_be_negative_when_demo_salary_is_reduced():
     assert demo_salary_balance_delta(1_100_000, 800_000) == -300_000
 
 
-
 def test_extended_demo_history_has_35_rows_across_three_calendar_months():
     from datetime import datetime, timezone
 
@@ -45,14 +44,19 @@ def test_extended_demo_history_has_35_rows_across_three_calendar_months():
     assert {row["amount_minor"] for row in salary_rows} == {DEFAULT_DEMO_SALARY_AMOUNT_MINOR}
     coffee_rows = [row for row in rows if "coffee" in str(row["description"]).casefold()]
     assert len(coffee_rows) == 3
-    assert {row["occurred_at"].strftime("%Y-%m") for row in coffee_rows} == {"2026-09", "2026-10", "2026-11"}
+    assert {row["occurred_at"].strftime("%Y-%m") for row in coffee_rows} == {
+        "2026-09",
+        "2026-10",
+        "2026-11",
+    }
     transport_rows = [row for row in rows if row["category"] == "TRANSPORT"]
     assert len(transport_rows) == 5
 
 
 def test_demo_history_salaries_follow_the_configured_demo_amount_and_employer():
     rows = build_demo_transaction_history(
-        employer="Example Employer", salary_amount_minor=975_000,
+        employer="Example Employer",
+        salary_amount_minor=975_000,
     )
     salary_rows = [row for row in rows if row["category"] == "INCOME"]
     assert all(row["amount_minor"] == 975_000 for row in salary_rows)

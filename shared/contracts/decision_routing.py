@@ -3,6 +3,7 @@
 This policy configures route ordering and task handling. It deliberately does
 not duplicate OCCF capability schemas or grant execution/financial authority.
 """
+
 from __future__ import annotations
 
 import json
@@ -42,19 +43,34 @@ class TaskDispatchRoute(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     task_class: Literal[
-        "resource", "mcp_read", "presentation", "workflow",
-        "frontend_action", "clarification", "unsupported",
+        "resource",
+        "mcp_read",
+        "presentation",
+        "workflow",
+        "frontend_action",
+        "clarification",
+        "unsupported",
     ]
     handler: Literal[
-        "registered_resource", "occf_read", "registered_presentation",
-        "registered_workflow", "registered_frontend_action",
-        "preserve_and_clarify", "explain_supported_scope",
+        "registered_resource",
+        "occf_read",
+        "registered_presentation",
+        "registered_workflow",
+        "registered_frontend_action",
+        "preserve_and_clarify",
+        "explain_supported_scope",
     ]
-    applicable_confidence_dimensions: list[Literal["intent", "slot", "entity"]] = Field(default_factory=lambda: ["intent"])
+    applicable_confidence_dimensions: list[Literal["intent", "slot", "entity"]] = Field(
+        default_factory=lambda: ["intent"]
+    )
     low_confidence_behavior: Literal[
-        "clarify_resource_or_topic", "clarify_missing_read_scope",
-        "clarify_missing_presentation_inputs", "preserve_workflow_and_clarify",
-        "clarify_action_target", "preserve_task_and_clarify", "offer_supported_scope",
+        "clarify_resource_or_topic",
+        "clarify_missing_read_scope",
+        "clarify_missing_presentation_inputs",
+        "preserve_workflow_and_clarify",
+        "clarify_action_target",
+        "preserve_task_and_clarify",
+        "offer_supported_scope",
     ]
     purpose: str = Field(min_length=1, max_length=500)
 
@@ -123,11 +139,19 @@ class DecisionRoutingPolicy(BaseModel):
             dimensions = route.applicable_confidence_dimensions
             if len(dimensions) != len(set(dimensions)):
                 raise ValueError(f"{route.task_class} confidence dimensions must be unique")
-            if "intent" not in dimensions and route.task_class not in {"clarification", "unsupported"}:
+            if "intent" not in dimensions and route.task_class not in {
+                "clarification",
+                "unsupported",
+            }:
                 raise ValueError(f"{route.task_class} must assess intent confidence")
         expected = {
-            "resource", "mcp_read", "presentation", "workflow",
-            "frontend_action", "clarification", "unsupported",
+            "resource",
+            "mcp_read",
+            "presentation",
+            "workflow",
+            "frontend_action",
+            "clarification",
+            "unsupported",
         }
         if set(task_classes) != expected:
             raise ValueError("task_dispatch must cover every supported task class")
@@ -142,7 +166,9 @@ class DecisionRoutingPolicy(BaseModel):
         }
         for route in self.task_dispatch:
             if route.handler != expected_handlers[route.task_class]:
-                raise ValueError(f"{route.task_class} must use its registered runtime owner {expected_handlers[route.task_class]}")
+                raise ValueError(
+                    f"{route.task_class} must use its registered runtime owner {expected_handlers[route.task_class]}"
+                )
         return self
 
 
@@ -154,14 +180,17 @@ def load_decision_routing_policy() -> DecisionRoutingPolicy:
     return DecisionRoutingPolicy.model_validate(payload)
 
 
-def ordered_pre_assessment_routes(policy: DecisionRoutingPolicy | None = None) -> tuple[PreAssessmentRoute, ...]:
+def ordered_pre_assessment_routes(
+    policy: DecisionRoutingPolicy | None = None,
+) -> tuple[PreAssessmentRoute, ...]:
     """Return enabled pre-assessment routes in their declared evaluation order."""
     policy = policy or load_decision_routing_policy()
     return tuple(route for route in policy.pre_assessment_routes if route.enabled)
 
 
 def task_dispatch_for_class(
-    task_class: str, policy: DecisionRoutingPolicy | None = None,
+    task_class: str,
+    policy: DecisionRoutingPolicy | None = None,
 ) -> TaskDispatchRoute | None:
     """Return the registered dispatch route for a resolved task class."""
     policy = policy or load_decision_routing_policy()

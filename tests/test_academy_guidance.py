@@ -29,10 +29,38 @@ def test_loan_schedule_explanation_uses_verified_schedule_and_distinguishes_rate
         "demo_only": True,
         "payment_tracking": "NOT_TRACKED",
         "installments": [
-            {"installment_number": 1, "due_date": "2026-12-23", "payment_minor": 22373, "principal_minor": 19500, "interest_minor": 2873, "status": "ILLUSTRATIVE"},
-            {"installment_number": 2, "due_date": "2027-01-23", "payment_minor": 22373, "principal_minor": 19612, "interest_minor": 2761, "status": "ILLUSTRATIVE"},
-            {"installment_number": 3, "due_date": "2027-02-23", "payment_minor": 22373, "principal_minor": 19725, "interest_minor": 2648, "status": "ILLUSTRATIVE"},
-            {"installment_number": 4, "due_date": "2027-03-23", "payment_minor": 22373, "principal_minor": 19839, "interest_minor": 2534, "status": "ILLUSTRATIVE"},
+            {
+                "installment_number": 1,
+                "due_date": "2026-12-23",
+                "payment_minor": 22373,
+                "principal_minor": 19500,
+                "interest_minor": 2873,
+                "status": "ILLUSTRATIVE",
+            },
+            {
+                "installment_number": 2,
+                "due_date": "2027-01-23",
+                "payment_minor": 22373,
+                "principal_minor": 19612,
+                "interest_minor": 2761,
+                "status": "ILLUSTRATIVE",
+            },
+            {
+                "installment_number": 3,
+                "due_date": "2027-02-23",
+                "payment_minor": 22373,
+                "principal_minor": 19725,
+                "interest_minor": 2648,
+                "status": "ILLUSTRATIVE",
+            },
+            {
+                "installment_number": 4,
+                "due_date": "2027-03-23",
+                "payment_minor": 22373,
+                "principal_minor": 19839,
+                "interest_minor": 2534,
+                "status": "ILLUSTRATIVE",
+            },
         ],
     }
     answer = render_loan_schedule_explanation(result)

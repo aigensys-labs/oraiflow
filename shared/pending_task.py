@@ -6,6 +6,7 @@ LangChain messages and serialized AG-UI/CopilotKit transcript dictionaries.
 The runtime only resumes context attached to the latest assistant response;
 older metadata cannot hijack a new turn.
 """
+
 from __future__ import annotations
 
 from typing import Any, Literal
@@ -63,7 +64,9 @@ def message_metadata(message: Any) -> dict[str, Any]:
 
 def attach_pending_task(message: Any, task: PendingTaskContext | dict[str, Any]) -> Any:
     """Attach a validated pending-task snapshot without replacing message identity."""
-    validated = task if isinstance(task, PendingTaskContext) else PendingTaskContext.model_validate(task)
+    validated = (
+        task if isinstance(task, PendingTaskContext) else PendingTaskContext.model_validate(task)
+    )
     metadata = dict(message_value(message, "additional_kwargs", {}) or {})
     metadata[PENDING_TASK_KEY] = validated.model_dump(mode="json")
     message.additional_kwargs = metadata
@@ -91,15 +94,13 @@ def latest_task_owner(
         default=-1,
     )
     assistant_after = [
-        index for index in range(latest_human + 1, len(items))
-        if message_type(items[index]) == "ai"
+        index for index in range(latest_human + 1, len(items)) if message_type(items[index]) == "ai"
     ]
     if assistant_after:
         owner_index = assistant_after[-1]
     else:
         assistant_before = [
-            index for index in range(0, latest_human)
-            if message_type(items[index]) == "ai"
+            index for index in range(0, latest_human) if message_type(items[index]) == "ai"
         ]
         if not assistant_before:
             return None
@@ -109,7 +110,9 @@ def latest_task_owner(
 
 
 def latest_task_context(
-    messages: list[Any] | tuple[Any, ...], *, domain: str | None = None,
+    messages: list[Any] | tuple[Any, ...],
+    *,
+    domain: str | None = None,
 ) -> PendingTaskContext | None:
     """Return the latest assistant-owned task, including its terminal status.
 
@@ -126,7 +129,9 @@ def latest_task_context(
 
 
 def latest_pending_task(
-    messages: list[Any] | tuple[Any, ...], *, domain: str | None = None,
+    messages: list[Any] | tuple[Any, ...],
+    *,
+    domain: str | None = None,
 ) -> PendingTaskContext | None:
     """Read only the latest assistant-owned ACTIVE task context."""
     task = latest_task_context(messages, domain=domain)

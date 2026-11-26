@@ -36,7 +36,12 @@ def test_preview_digest_is_stable_and_verifiable():
 def test_preview_digest_binds_beneficiary_amount_and_tenant():
     preview = sample_preview()
     digest = preview_digest(preview, "test-signing-secret")
-    for field, changed in (("beneficiary", "Jordan Li"), ("beneficiary_contact_id", "ct-contact-123456"), ("amount_minor", 2501), ("tenant_id", "tenant-other")):
+    for field, changed in (
+        ("beneficiary", "Jordan Li"),
+        ("beneficiary_contact_id", "ct-contact-123456"),
+        ("amount_minor", 2501),
+        ("tenant_id", "tenant-other"),
+    ):
         tampered = {**preview, field: changed}
         assert not verify_preview_digest(tampered, digest, "test-signing-secret")
 
@@ -44,7 +49,10 @@ def test_preview_digest_binds_beneficiary_amount_and_tenant():
 def test_preview_digest_binds_persisted_policy_details():
     preview = sample_preview()
     digest = preview_digest(preview, "test-signing-secret")
-    tampered = {**preview, "policy_details": {**preview["policy_details"], "max_transfer_minor": 90000}}
+    tampered = {
+        **preview,
+        "policy_details": {**preview["policy_details"], "max_transfer_minor": 90000},
+    }
     assert not verify_preview_digest(tampered, digest, "test-signing-secret")
 
 

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Generate frontend contract metadata from the canonical JSON registry."""
+
 from __future__ import annotations
 
 import argparse
@@ -33,7 +34,9 @@ def main() -> int:
     generated = render()
     if args.check:
         if not TARGET.exists() or TARGET.read_text(encoding="utf-8") != generated:
-            print("Frontend capability contracts are stale. Run: python scripts/generate_contracts.py")
+            print(
+                "Frontend capability contracts are stale. Run: python scripts/generate_contracts.py"
+            )
             return 1
         print("Frontend capability contracts are up to date.")
         return 0

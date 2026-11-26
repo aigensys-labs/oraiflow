@@ -16,6 +16,7 @@ from services.agent_runtime.agui import register_agui_routes, start_agui_runtime
 from services.agent_runtime.interpretation import confidence_gate_configuration
 from shared.version import __version__
 
+
 def _configure_application_logging() -> None:
     """Emit ORAI Agent Runtime application logs to stdout at the configured level."""
     level_name = os.getenv("LOG_LEVEL", "INFO").upper()
@@ -23,12 +24,16 @@ def _configure_application_logging() -> None:
     namespace = logging.getLogger("oraiflow.agent_runtime")
     namespace.setLevel(level)
     namespace.propagate = False
-    if not any(getattr(handler, "_oraiflow_runtime_handler", False) for handler in namespace.handlers):
+    if not any(
+        getattr(handler, "_oraiflow_runtime_handler", False) for handler in namespace.handlers
+    ):
         handler = logging.StreamHandler(sys.stdout)
-        handler.setFormatter(logging.Formatter(
-            "%(asctime)s %(levelname)s [%(name)s] %(message)s",
-            datefmt="%Y-%m-%dT%H:%M:%S",
-        ))
+        handler.setFormatter(
+            logging.Formatter(
+                "%(asctime)s %(levelname)s [%(name)s] %(message)s",
+                datefmt="%Y-%m-%dT%H:%M:%S",
+            )
+        )
         handler._oraiflow_runtime_handler = True
         namespace.addHandler(handler)
 
@@ -36,6 +41,7 @@ def _configure_application_logging() -> None:
 _configure_application_logging()
 logger = logging.getLogger("oraiflow.agent_runtime")
 INTERNAL_TOKEN = os.getenv("AGENT_RUNTIME_INTERNAL_TOKEN", "local-agent-runtime-token-change-me")
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -65,7 +71,12 @@ class ChatRequest(BaseModel):
 @app.get("/healthz")
 async def healthz():
     """Report the Agent Runtime process health."""
-    return {"status": "ok", "service": "agent-runtime", "version": __version__, "agui": bool(getattr(app.state, "agui_agent", None))}
+    return {
+        "status": "ok",
+        "service": "agent-runtime",
+        "version": __version__,
+        "agui": bool(getattr(app.state, "agui_agent", None)),
+    }
 
 
 def _require_internal(request: Request) -> None:

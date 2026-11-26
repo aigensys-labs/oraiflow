@@ -1,4 +1,5 @@
 """Banking Kernel adapter implementations and explicit adapter selection."""
+
 from __future__ import annotations
 
 import os

@@ -14,7 +14,10 @@ from temporalio.worker import Worker
 from shared.database import ensure_runtime_schema, get_engine
 from shared.audit import append_audit_event
 from services.worker.workflows import (
-    TransferWorkflow, mark_transfer_executing, mark_transfer_requires_reconciliation, settle_transfer,
+    TransferWorkflow,
+    mark_transfer_executing,
+    mark_transfer_requires_reconciliation,
+    settle_transfer,
 )
 
 logger = logging.getLogger("oraiflow.worker")
@@ -42,8 +45,6 @@ def claim_outbox_event() -> dict | None:
         return dict(row) if row else None
 
 
-
-
 def requeue_unsettled_outbox_events() -> int:
     """Reconcile pending commands after worker or disposable Temporal restarts.
 
@@ -67,31 +68,53 @@ def requeue_unsettled_outbox_events() -> int:
 def mark_outbox_dispatched(event_id: int, command_id: str, workflow_id: str) -> None:
     """Mark an outbox event as dispatched to its Temporal workflow."""
     with get_engine().begin() as conn:
-        conn.execute(text("""
+        conn.execute(
+            text("""
             UPDATE transfer_outbox
                SET status='DISPATCHED', dispatched_at=NOW(), claimed_at=NULL, last_error=NULL
              WHERE event_id=:event_id
-        """), {"event_id": event_id})
-        command = conn.execute(text("""
+        """),
+            {"event_id": event_id},
+        )
+        command = (
+            conn.execute(
+                text("""
             UPDATE transfer_commands
                SET temporal_workflow_id=:workflow_id, outbox_event_id=:event_id, updated_at=NOW()
              WHERE command_id=:command_id
             RETURNING user_id, tenant_id
-        """), {"workflow_id": workflow_id, "event_id": event_id, "command_id": command_id}).mappings().first()
+        """),
+                {"workflow_id": workflow_id, "event_id": event_id, "command_id": command_id},
+            )
+            .mappings()
+            .first()
+        )
         if command:
-            append_audit_event(conn, "system:temporal-dispatcher", "TRANSFER_WORKFLOW_DISPATCHED", command_id,
-                {"outbox_event_id": event_id, "workflow_id": workflow_id,
-                 "task_queue": os.getenv("TEMPORAL_TASK_QUEUE", "oraiflow-transfers")}, command["tenant_id"])
+            append_audit_event(
+                conn,
+                "system:temporal-dispatcher",
+                "TRANSFER_WORKFLOW_DISPATCHED",
+                command_id,
+                {
+                    "outbox_event_id": event_id,
+                    "workflow_id": workflow_id,
+                    "task_queue": os.getenv("TEMPORAL_TASK_QUEUE", "oraiflow-transfers"),
+                },
+                command["tenant_id"],
+            )
 
 
 def release_outbox_event(event_id: int, error: Exception) -> None:
     """Release a claimed outbox event after a dispatch failure."""
     with get_engine().begin() as conn:
-        conn.execute(text("""
+        conn.execute(
+            text("""
             UPDATE transfer_outbox
                SET status='PENDING', claimed_at=NULL, last_error=:error
              WHERE event_id=:event_id
-        """), {"event_id": event_id, "error": f"{type(error).__name__}: {error}"[:1000]})
+        """),
+            {"event_id": event_id, "error": f"{type(error).__name__}: {error}"[:1000]},
+        )
 
 
 async def dispatch_outbox(client: Client, task_queue: str) -> None:
@@ -114,7 +137,9 @@ async def dispatch_outbox(client: Client, task_queue: str) -> None:
             except WorkflowAlreadyStartedError:
                 # API/client retries and dispatcher lease recovery are idempotent.
                 pass
-            await asyncio.to_thread(mark_outbox_dispatched, event["event_id"], command_id, workflow_id)
+            await asyncio.to_thread(
+                mark_outbox_dispatched, event["event_id"], command_id, workflow_id
+            )
             logger.info("Dispatched transfer command=%s workflow=%s", command_id, workflow_id)
         except Exception as exc:
             logger.exception("Outbox dispatch failed for command=%s", command_id)
@@ -133,13 +158,19 @@ async def main() -> None:
             client = await Client.connect(address)
             requeued = await asyncio.to_thread(requeue_unsettled_outbox_events)
             if requeued:
-                logger.warning("Requeued %s unsettled transfer event(s) for Temporal reconciliation", requeued)
+                logger.warning(
+                    "Requeued %s unsettled transfer event(s) for Temporal reconciliation", requeued
+                )
             logger.info("Connected to Temporal at %s; task queue=%s", address, task_queue)
             worker = Worker(
                 client,
                 task_queue=task_queue,
                 workflows=[TransferWorkflow],
-                activities=[mark_transfer_executing, settle_transfer, mark_transfer_requires_reconciliation],
+                activities=[
+                    mark_transfer_executing,
+                    settle_transfer,
+                    mark_transfer_requires_reconciliation,
+                ],
             )
             worker_task = asyncio.create_task(worker.run())
             dispatcher_task = asyncio.create_task(dispatch_outbox(client, task_queue))

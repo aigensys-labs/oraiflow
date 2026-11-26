@@ -1,6 +1,8 @@
 from services.agent_runtime.intent_contracts import classify_canonical_read_intent
 from services.agent_runtime.scope_policy import (
-    SAVINGS_EDUCATION_FALLBACK, finalize_response_envelope, is_savings_education_request,
+    SAVINGS_EDUCATION_FALLBACK,
+    finalize_response_envelope,
+    is_savings_education_request,
 )
 
 
@@ -15,7 +17,8 @@ def test_savings_account_good_for_is_in_scope_financial_literacy():
     assert is_savings_education_request(question)
     classification, answer = finalize_response_envelope(
         {"classification": "OUT_OF_SCOPE", "message": "I cannot help."},
-        current_user_text=question, registered_intents={"ACCOUNT_OVERVIEW"},
+        current_user_text=question,
+        registered_intents={"ACCOUNT_OVERVIEW"},
     )
     assert classification == "EDUCATIONAL_GUIDANCE"
     assert answer == SAVINGS_EDUCATION_FALLBACK
@@ -25,11 +28,19 @@ def test_accounts_page_contains_only_deposit_accounts_and_loans_have_dedicated_w
     from pathlib import Path
 
     source = (Path(__file__).resolve().parents[1] / "apps/web/src/main.jsx").read_text()
-    loan_page = source[source.index("function LoanDetailsPage"):source.index("function AcademyPage")]
-    accounts_page = source[source.index("function AccountsPage"):source.index("function ContactsPage")]
+    loan_page = source[
+        source.index("function LoanDetailsPage") : source.index("function AcademyPage")
+    ]
+    accounts_page = source[
+        source.index("function AccountsPage") : source.index("function ContactsPage")
+    ]
     assert "Loans &amp; credit" in loan_page
     assert "not a real credit agreement" in loan_page
-    assert "payment_tracking" in (Path(__file__).resolve().parents[1] / "shared/loan_demo.py").read_text() or "NOT_TRACKED" in loan_page
+    assert (
+        "payment_tracking"
+        in (Path(__file__).resolve().parents[1] / "shared/loan_demo.py").read_text()
+        or "NOT_TRACKED" in loan_page
+    )
     assert "never count as available money or transfer sources" in loan_page
     assert "loan-overview-card" not in accounts_page
     assert "All accounts" in accounts_page
@@ -42,7 +53,12 @@ def test_compose_passes_loan_demo_configuration_to_migration_environment():
     root = Path(__file__).resolve().parents[1]
     compose = yaml.safe_load((root / "docker-compose.yml").read_text())
     migration_environment = compose["services"]["migrate"]["environment"]
-    for name in ("DEMO_LOAN_ENABLED", "DEMO_LOAN_PRINCIPAL_MINOR", "DEMO_LOAN_APR_BPS", "DEMO_LOAN_TERM_MONTHS"):
+    for name in (
+        "DEMO_LOAN_ENABLED",
+        "DEMO_LOAN_PRINCIPAL_MINOR",
+        "DEMO_LOAN_APR_BPS",
+        "DEMO_LOAN_TERM_MONTHS",
+    ):
         assert name in migration_environment
 
 
@@ -62,12 +78,14 @@ def test_overview_accounts_panel_keeps_only_three_deposit_accounts():
     from pathlib import Path
 
     source = (Path(__file__).resolve().parents[1] / "apps/web/src/main.jsx").read_text()
-    overview = source[source.index("function OverviewPage"):source.index("function LoanDetailsPage")]
+    overview = source[
+        source.index("function OverviewPage") : source.index("function LoanDetailsPage")
+    ]
     assert "accounts.slice(0, 3)" in overview
     assert "loan-account-divider" not in overview
     assert "loan-account-row" not in overview
     assert "const primaryLoan" in overview
-    assert "label=\"Loans\"" in overview
+    assert 'label="Loans"' in overview
 
 
 def test_deposit_total_is_not_modified_to_include_loan_liability():
@@ -76,18 +94,24 @@ def test_deposit_total_is_not_modified_to_include_loan_liability():
     source = (Path(__file__).resolve().parents[1] / "apps/web/src/main.jsx").read_text()
     assert "const total = overview?.total_balance?.amount_minor ?? 0" in source
     # Loan amount is rendered in its own summary and is not added to `total`.
-    assert "fmtMoney(primaryLoan.outstanding_principal_minor ?? primaryLoan.principal_minor" in source
+    assert (
+        "fmtMoney(primaryLoan.outstanding_principal_minor ?? primaryLoan.principal_minor" in source
+    )
 
 
 def test_overview_banner_contains_recorded_financial_health_and_is_after_welcome():
     from pathlib import Path
 
     source = (Path(__file__).resolve().parents[1] / "apps/web/src/main.jsx").read_text()
-    overview = source[source.index("function OverviewPage"):source.index("function LoanDetailsPage")]
+    overview = source[
+        source.index("function OverviewPage") : source.index("function LoanDetailsPage")
+    ]
     assert "hero-health-panel" in overview
     assert "Loans / recorded equity" in overview
     assert "All liabilities / recorded deposits" in overview
-    assert overview.index("welcome-row") < overview.index("hero-banner") < overview.index("stats-grid")
+    assert (
+        overview.index("welcome-row") < overview.index("hero-banner") < overview.index("stats-grid")
+    )
     app = source[source.index("function App()") :]
     assert "window.localStorage.getItem('oraiflow.overviewHeroVisible') === 'true'" in app
     assert "catch { return false }" in app
@@ -132,8 +156,14 @@ def test_workspace_and_academy_ui_consume_the_versioned_registry_catalogue():
     assert "`${workspace.purpose} ${workspace.value}`" in ui
     assert "data-workspace-catalogue-version={WORKSPACE_CATALOGUE_VERSION}" in ui
     assert "ACADEMY_TOPICS.map" in ui
-    assert "export const WORKSPACE_CATALOGUE = Object.freeze(CONTRACT_REGISTRY.application_policy?.workspaces || {})" in contracts
-    assert "export const ACADEMY_TOPICS = Object.freeze(CONTRACT_REGISTRY.application_policy?.academy_topics || [])" in contracts
+    assert (
+        "export const WORKSPACE_CATALOGUE = Object.freeze(CONTRACT_REGISTRY.application_policy?.workspaces || {})"
+        in contracts
+    )
+    assert (
+        "export const ACADEMY_TOPICS = Object.freeze(CONTRACT_REGISTRY.application_policy?.academy_topics || [])"
+        in contracts
+    )
     assert "export const CONTRACT_REGISTRY" in generated
 
     # Every registered workspace represented in the UI uses a stable workspaceId.
@@ -166,8 +196,15 @@ def test_academy_learning_paths_share_panel_height_and_orai_scrollbar_treatment(
     assert ".academy-chat-section > .copilot-page-card," in styles
     assert ".academy-topics-section > .academy-topic-list" in styles
     assert ".academy-topic-list::-webkit-scrollbar,.chat-messages::-webkit-scrollbar" in styles
-    assert ".academy-topic-list::-webkit-scrollbar-thumb,.chat-messages::-webkit-scrollbar-thumb" in styles
-    assert ".academy-topic-list {" in styles and "scrollbar-width:thin" in styles and "scrollbar-color:#29435a transparent" in styles
+    assert (
+        ".academy-topic-list::-webkit-scrollbar-thumb,.chat-messages::-webkit-scrollbar-thumb"
+        in styles
+    )
+    assert (
+        ".academy-topic-list {" in styles
+        and "scrollbar-width:thin" in styles
+        and "scrollbar-color:#29435a transparent" in styles
+    )
 
 
 def test_academy_and_cards_disclosure_banners_have_consistent_top_spacing():
@@ -184,10 +221,14 @@ def test_customer_response_interceptor_preserves_streamed_message_identity():
     from pathlib import Path
 
     source = (Path(__file__).resolve().parents[1] / "services/agent_runtime/agent.py").read_text()
-    protocol = source[source.index("def _customer_response_from_protocol"):source.index("def _pending_navigation_message")]
+    protocol = source[
+        source.index("def _customer_response_from_protocol") : source.index(
+            "def _pending_navigation_message"
+        )
+    ]
     assert "replace_assistant_message_content(" in protocol
-    assert "streamed_content = getattr(response, \"content\", \"\")" in protocol
-    assert "streamed_customer_text=str(streamed_content or \"\")" in protocol
+    assert 'streamed_content = getattr(response, "content", "")' in protocol
+    assert 'streamed_customer_text=str(streamed_content or "")' in protocol
     assert "AIMessage(\n            content=customer_text" not in protocol
 
 

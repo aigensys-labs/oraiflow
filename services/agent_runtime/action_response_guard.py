@@ -5,12 +5,12 @@ must first be validated and converted into a customer-facing assistant
 acknowledgement. That acknowledgement carries standard message identity and
 receipt metadata so the graph can then stop replay safely.
 """
+
 from __future__ import annotations
 
 from typing import Any
 
 from shared.pending_task import message_type, message_value, pending_task_from_message
-
 
 RECEIPT_KEY = "oraiflow_frontend_action_receipt"
 WORKFLOW_KEY = "oraiflow_transfer_workflow"
@@ -66,7 +66,7 @@ def has_successful_frontend_ack_after_latest_user(messages: list[Any] | None) ->
     if latest_user_index < 0:
         return False
 
-    current_turn = items[latest_user_index + 1:]
+    current_turn = items[latest_user_index + 1 :]
 
     # A browser ToolMessage is an execution receipt, not yet a customer-facing
     # final response. It must first pass through _handle_transfer_workflow() or
@@ -106,7 +106,9 @@ def has_successful_frontend_ack_after_latest_user(messages: list[Any] | None) ->
             continue
         workflow = metadata.get(WORKFLOW_KEY)
         if isinstance(workflow, dict):  # read-only compatibility for old checkpoints
-            if (str(workflow.get("stage", "")) == "DRAFT_OPENED"
-                    and str(workflow.get("last_action_status", "")).lower() == "draft_opened"):
+            if (
+                str(workflow.get("stage", "")) == "DRAFT_OPENED"
+                and str(workflow.get("last_action_status", "")).lower() == "draft_opened"
+            ):
                 return True
     return False

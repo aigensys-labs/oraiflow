@@ -4,6 +4,7 @@ This module owns the mapping from an interpreted, registered intent to the
 canonical capability declared by OCCF. The LLM never supplies capability IDs,
 tool names, input schemas, execution effects or authorization decisions.
 """
+
 from __future__ import annotations
 
 import re
@@ -50,12 +51,14 @@ def _strip_registered_grouping_suffix(
     month_phrases = phrase_map.get("month", []) if isinstance(phrase_map, dict) else []
     if not isinstance(month_phrases, list):
         return candidate
-    for phrase in sorted((str(item).strip() for item in month_phrases if str(item).strip()), key=len, reverse=True):
+    for phrase in sorted(
+        (str(item).strip() for item in month_phrases if str(item).strip()), key=len, reverse=True
+    ):
         words = re.split(r"\s+", phrase)
         suffix = r"\s+" + r"\s+".join(re.escape(word) for word in words) + r"\s*$"
         match = re.search(suffix, candidate, flags=re.IGNORECASE)
         if match:
-            cleaned = candidate[:match.start()].strip(" \t\r\n.,;:!?\"'")
+            cleaned = candidate[: match.start()].strip(" \t\r\n.,;:!?\"'")
             if cleaned:
                 return cleaned
     return candidate
@@ -107,11 +110,9 @@ def _semantic_value_from_customer_text(spec: dict[str, Any], customer_text: str)
     if not matches:
         return None
     specific = [
-        item for item in matches
-        if not any(
-            other[0] > item[0] and f" {item[1]} " in f" {other[1]} "
-            for other in matches
-        )
+        item
+        for item in matches
+        if not any(other[0] > item[0] and f" {item[1]} " in f" {other[1]} " for other in matches)
     ]
     values = {item[2] for item in specific}
     return next(iter(values)) if len(values) == 1 else None
@@ -145,7 +146,9 @@ def _resolve_semantic_inputs(
         if inferred is not None:
             return inferred
         location = definition.get("location", "slots")
-        values = task.slots if location == "slots" else task.entities if location == "entities" else {}
+        values = (
+            task.slots if location == "slots" else task.entities if location == "entities" else {}
+        )
         candidate = values.get(name)
         if candidate not in (None, ""):
             return candidate
@@ -158,7 +161,9 @@ def _resolve_semantic_inputs(
             unsupported.append(str(field_name))
             continue
         location = spec.get("location", "slots")
-        values = task.slots if location == "slots" else task.entities if location == "entities" else {}
+        values = (
+            task.slots if location == "slots" else task.entities if location == "entities" else {}
+        )
         # A registered current-turn phrase fills a missing/unevidenced value.
         # Explicit field-level evidence has already passed the interpretation
         # gate, which rejects a proposal whose evidence supports another value.
@@ -166,13 +171,21 @@ def _resolve_semantic_inputs(
         if value in (None, ""):
             for conditional in spec.get("conditional_defaults", []):
                 when = conditional.get("when", {}) if isinstance(conditional, dict) else {}
-                if isinstance(when, dict) and when and all(
-                    str(supplied_value(str(dependency)) or "") == str(expected)
-                    for dependency, expected in when.items()
+                if (
+                    isinstance(when, dict)
+                    and when
+                    and all(
+                        str(supplied_value(str(dependency)) or "") == str(expected)
+                        for dependency, expected in when.items()
+                    )
                 ):
                     value = conditional.get("value")
                     break
-            if value in (None, "") and spec.get("default_policy") == "when_unspecified" and spec.get("default") is not None:
+            if (
+                value in (None, "")
+                and spec.get("default_policy") == "when_unspecified"
+                and spec.get("default") is not None
+            ):
                 value = str(spec["default"])
         if value in (None, ""):
             if spec.get("required") is True:
@@ -225,22 +238,29 @@ def _apply_registered_semantic_evidence(
         if existing not in (None, "") and existing != inferred and field_evidence:
             continue
         if existing == inferred and any(
-            item.source == "current_turn"
-            and _normalise(customer_text) in _normalise(item.quote)
+            item.source == "current_turn" and _normalise(customer_text) in _normalise(item.quote)
             for item in field_evidence
         ):
             continue
         target[field_name] = inferred
         evidence = [item for item in evidence if item.field != field_name]
-        evidence.append(TaskEvidence(
-            field=field_name, source="current_turn", quote=customer_text,
-        ))
+        evidence.append(
+            TaskEvidence(
+                field=field_name,
+                source="current_turn",
+                quote=customer_text,
+            )
+        )
         changed = True
     if not changed:
         return task
-    return task.model_copy(update={
-        "slots": slots, "entities": entities, "evidence": evidence,
-    })
+    return task.model_copy(
+        update={
+            "slots": slots,
+            "entities": entities,
+            "evidence": evidence,
+        }
+    )
 
 
 def _extract_registered_entities(
@@ -275,9 +295,13 @@ def _extract_registered_entities(
         ):
             entities["merchant_query"] = cleaned_merchant
             evidence = [item for item in evidence if item.field != "merchant_query"]
-            evidence.append(TaskEvidence(
-                field="merchant_query", source="current_turn", quote=cleaned_merchant,
-            ))
+            evidence.append(
+                TaskEvidence(
+                    field="merchant_query",
+                    source="current_turn",
+                    quote=cleaned_merchant,
+                )
+            )
             extracted.add("merchant_query")
 
     # Category terms are declared by OCCF so a spending type is not mistaken
@@ -293,7 +317,11 @@ def _extract_registered_entities(
                 term_text = str(term or "").strip()
                 if not term_text or len(term_text) > maximum:
                     continue
-                pattern = r"(?<!\w)" + r"\s+".join(re.escape(part) for part in term_text.split()) + r"(?!\w)"
+                pattern = (
+                    r"(?<!\w)"
+                    + r"\s+".join(re.escape(part) for part in term_text.split())
+                    + r"(?!\w)"
+                )
                 match = re.search(pattern, customer_text, re.IGNORECASE)
                 if match:
                     matches.append((len(term_text.split()), match.group(0)))
@@ -304,7 +332,9 @@ def _extract_registered_entities(
                 candidate = next(item[1] for item in matches if item[0] == longest)
                 entities["category_query"] = candidate
                 evidence = [item for item in evidence if item.field != "category_query"]
-                evidence.append(TaskEvidence(field="category_query", source="current_turn", quote=candidate))
+                evidence.append(
+                    TaskEvidence(field="category_query", source="current_turn", quote=candidate)
+                )
                 extracted.add("category_query")
                 # If the model redundantly called the same registered category
                 # a merchant, retain only the more precise category selector.
@@ -329,9 +359,13 @@ def _extract_registered_entities(
             except re.error:
                 match = None
             if match and match.lastindex:
-                candidate = match.group(1).strip(" \t\r\n.,;:!?\"\'")
+                candidate = match.group(1).strip(" \t\r\n.,;:!?\"'")
                 break
-        if not candidate or len(candidate) > maximum or candidate.casefold() in {"it", "that", "them", "everything", "all"}:
+        if (
+            not candidate
+            or len(candidate) > maximum
+            or candidate.casefold() in {"it", "that", "them", "everything", "all"}
+        ):
             continue
         # Avoid carrying possessive/determiner noise into the literal substring
         # filter while retaining the exact captured customer text as evidence.
@@ -369,33 +403,51 @@ def _arguments_for_capability(
         mappings = spec.get("argument_mappings", {}) if isinstance(spec, dict) else {}
         mapped = mappings.get(value, {}) if isinstance(mappings, dict) else {}
         if not isinstance(mapped, dict):
-            return {}, "I couldn't safely map that requested selection to the registered operation.", []
+            return (
+                {},
+                "I couldn't safely map that requested selection to the registered operation.",
+                [],
+            )
         for target_name, target_value in mapped.items():
             if target_name not in properties:
-                return {}, "I couldn't safely map that requested selection to the registered operation.", []
+                return (
+                    {},
+                    "I couldn't safely map that requested selection to the registered operation.",
+                    [],
+                )
             arguments[target_name] = target_value
 
     if capability_id == "banking.contacts.search":
         if task.intent_id == "SAVED_CONTACT_LOOKUP":
-            contact_name = (
-                task.entities.get("contact_name") or task.slots.get("contact_name")
-            )
+            contact_name = task.entities.get("contact_name") or task.slots.get("contact_name")
             if not contact_name:
-                return {}, "Whose saved contact details would you like me to find?", ["contact_name"]
+                return (
+                    {},
+                    "Whose saved contact details would you like me to find?",
+                    ["contact_name"],
+                )
             arguments["name_query"] = contact_name
         else:
             beneficiary = (
-                task.entities.get("beneficiary") or task.entities.get("recipient")
-                or task.slots.get("beneficiary") or task.slots.get("recipient")
+                task.entities.get("beneficiary")
+                or task.entities.get("recipient")
+                or task.slots.get("beneficiary")
+                or task.slots.get("recipient")
             )
             if not beneficiary:
-                return {}, "I understood that you want to prepare a transfer, but I still need the saved recipient's name. Who would you like to send it to? No draft was opened.", ["beneficiary"]
+                return (
+                    {},
+                    "I understood that you want to prepare a transfer, but I still need the saved recipient's name. Who would you like to send it to? No draft was opened.",
+                    ["beneficiary"],
+                )
             arguments["name_query"] = beneficiary
 
     elif capability_id == "frontend.workspace.navigate":
         workspace = (
-            task.entities.get("workspace") or task.entities.get("workspace_name")
-            or task.slots.get("workspace") or task.slots.get("workspace_name")
+            task.entities.get("workspace")
+            or task.entities.get("workspace_name")
+            or task.slots.get("workspace")
+            or task.slots.get("workspace_name")
         )
         if not workspace:
             return {}, "Which ORAIflow workspace would you like me to open?", ["workspace"]
@@ -403,22 +455,45 @@ def _arguments_for_capability(
         resolved = aliases.get(_normalise(workspace), workspace)
         allowed = registry.get("application_policy", {}).get("navigation", {}).get("pages", [])
         if resolved not in allowed:
-            return {}, "I can help open an ORAIflow workspace. Which workspace did you mean?", ["workspace"]
-        arguments.update({
-            "workspace": resolved,
-            "action_id": f"nav-{uuid.uuid4().hex}",
-            "navigation_epoch": max(0, int(context.get("navigation_epoch", 0) or 0)),
-        })
+            return (
+                {},
+                "I can help open an ORAIflow workspace. Which workspace did you mean?",
+                ["workspace"],
+            )
+        arguments.update(
+            {
+                "workspace": resolved,
+                "action_id": f"nav-{uuid.uuid4().hex}",
+                "navigation_epoch": max(0, int(context.get("navigation_epoch", 0) or 0)),
+            }
+        )
 
     elif capability_id == "frontend.account.select":
         account_id = task.entities.get("account_id") or task.slots.get("account_id")
-        account_name = task.entities.get("account_name") or task.entities.get("account") or task.slots.get("account_name") or task.slots.get("account")
+        account_name = (
+            task.entities.get("account_name")
+            or task.entities.get("account")
+            or task.slots.get("account_name")
+            or task.slots.get("account")
+        )
         accounts = [item for item in context.get("accounts", []) if isinstance(item, dict)]
-        matches = [item for item in accounts if account_id and str(item.get("account_id", "")) == str(account_id)]
+        matches = [
+            item
+            for item in accounts
+            if account_id and str(item.get("account_id", "")) == str(account_id)
+        ]
         if not matches and account_name:
-            matches = [item for item in accounts if _normalise(item.get("account_name")) == _normalise(account_name)]
+            matches = [
+                item
+                for item in accounts
+                if _normalise(item.get("account_name")) == _normalise(account_name)
+            ]
         if len(matches) != 1:
-            return {}, "Which of your listed accounts should I select? Please use its account name.", ["account_id"]
+            return (
+                {},
+                "Which of your listed accounts should I select? Please use its account name.",
+                ["account_id"],
+            )
         arguments["account_id"] = str(matches[0].get("account_id", ""))
 
     else:
@@ -437,7 +512,11 @@ def _arguments_for_capability(
         }
         for source in (task.slots, task.entities):
             for source_name, target_name in aliases.items():
-                if source_name in source and target_name in properties and target_name not in arguments:
+                if (
+                    source_name in source
+                    and target_name in properties
+                    and target_name not in arguments
+                ):
                     arguments[target_name] = source[source_name]
 
     # Derive mandatory input fields from the OCCF JSON Schema, not from a
@@ -445,7 +524,8 @@ def _arguments_for_capability(
     # the authoritative final validation below.
     required = capability.get("input_schema", {}).get("required", [])
     missing_fields = [
-        str(field) for field in required
+        str(field)
+        for field in required
         if field not in arguments or arguments.get(field) in (None, "", [], {})
     ]
     if missing_fields:
@@ -456,14 +536,23 @@ def _arguments_for_capability(
         if len(labels) == 1:
             question = f"To continue, I need {labels[0]}. Could you provide it?"
         else:
-            question = "To continue, I need " + ", ".join(labels[:-1]) + " and " + labels[-1] + ". Could you provide those details?"
+            question = (
+                "To continue, I need "
+                + ", ".join(labels[:-1])
+                + " and "
+                + labels[-1]
+                + ". Could you provide those details?"
+            )
         return arguments, question, missing_fields
     try:
         validate_capability_input(capability_id, arguments)
     except ContractViolation:
-        return {}, "I understood what you want to do, but I need one more detail before I can safely continue. Could you clarify the missing information?", []
+        return (
+            {},
+            "I understood what you want to do, but I need one more detail before I can safely continue. Could you clarify the missing information?",
+            [],
+        )
     return arguments, None, []
-
 
 
 def _plan_resource_task(
@@ -479,32 +568,41 @@ def _plan_resource_task(
     allowed_resources = {"academy_topics", "workspace_catalogue", "assistant_capabilities"}
     if resource_id not in allowed_resources:
         return {
-            "task_id": f"task-{uuid.uuid4().hex}", "intent_id": task.intent_id,
-            "task_class": "resource", "status": "REJECTED",
+            "task_id": f"task-{uuid.uuid4().hex}",
+            "intent_id": task.intent_id,
+            "task_class": "resource",
+            "status": "REJECTED",
             "reason_code": "RESOURCE_NOT_REGISTERED",
             "clarification_question": "I couldn't resolve that request to a registered ORAIflow information resource.",
         }
 
     customer_evidence = [
-        item for item in task.evidence
-        if item.field == "intent" and item.source in {"current_turn", "conversation"}
+        item
+        for item in task.evidence
+        if item.field == "intent"
+        and item.source in {"current_turn", "conversation"}
         and item.quote.casefold() in str(sources.get(item.source, "")).casefold()
     ]
     if not customer_evidence:
         return {
-            "task_id": f"task-{uuid.uuid4().hex}", "intent_id": task.intent_id,
-            "task_class": "resource", "status": "CLARIFICATION_REQUIRED",
+            "task_id": f"task-{uuid.uuid4().hex}",
+            "intent_id": task.intent_id,
+            "task_class": "resource",
+            "status": "CLARIFICATION_REQUIRED",
             "reason_code": "RESOURCE_INTENT_EVIDENCE_MISSING",
             "clarification_question": "I can help with the ORAIflow information resources. What concept or workspace would you like explained?",
         }
 
     load_decision_routing_policy()  # Validate the human routing policy before dispatch.
     from services.agent_runtime.interpretation import confidence_gate_configuration
+
     gate = confidence_gate_configuration()
     if not gate.get("valid"):
         return {
-            "task_id": f"task-{uuid.uuid4().hex}", "intent_id": task.intent_id,
-            "task_class": "resource", "status": "REJECTED",
+            "task_id": f"task-{uuid.uuid4().hex}",
+            "intent_id": task.intent_id,
+            "task_class": "resource",
+            "status": "REJECTED",
             "reason_code": "CONFIDENCE_GATE_CONFIGURATION_INVALID",
             "clarification_question": "I couldn't validate the interpretation configuration. Please try again later.",
         }
@@ -513,27 +611,37 @@ def _plan_resource_task(
         threshold = gate.get("thresholds", {}).get("intent")
         if score is None or threshold is None or score < threshold:
             return {
-                "task_id": f"task-{uuid.uuid4().hex}", "intent_id": task.intent_id,
-                "task_class": "resource", "status": "CLARIFICATION_REQUIRED",
+                "task_id": f"task-{uuid.uuid4().hex}",
+                "intent_id": task.intent_id,
+                "task_class": "resource",
+                "status": "CLARIFICATION_REQUIRED",
                 "reason_code": "RESOURCE_INTENT_CONFIDENCE_BELOW_THRESHOLD",
-                "clarification_question": task.clarification_question or "I found a relevant information area, but I want to make sure I explain the right topic. Which concept did you mean?",
+                "clarification_question": task.clarification_question
+                or "I found a relevant information area, but I want to make sure I explain the right topic. Which concept did you mean?",
             }
 
     application = registry.get("application_policy", {})
     references: dict[str, str] = {}
     if resource_id == "academy_topics":
         topic_ids = {
-            str(item.get("topic_id")) for item in application.get("academy_topics", [])
+            str(item.get("topic_id"))
+            for item in application.get("academy_topics", [])
             if isinstance(item, dict) and item.get("topic_id")
         }
         raw_topic_ids = task.entities.get("topic_ids") or task.slots.get("topic_ids")
         topic_id = task.entities.get("topic_id") or task.slots.get("topic_id")
-        selected_topic_ids = [value.strip() for value in str(raw_topic_ids).split(",") if value.strip()] if raw_topic_ids else ([topic_id] if topic_id else [])
+        selected_topic_ids = (
+            [value.strip() for value in str(raw_topic_ids).split(",") if value.strip()]
+            if raw_topic_ids
+            else ([topic_id] if topic_id else [])
+        )
         unknown_topics = [value for value in selected_topic_ids if value not in topic_ids]
         if unknown_topics:
             return {
-                "task_id": f"task-{uuid.uuid4().hex}", "intent_id": task.intent_id,
-                "task_class": "resource", "status": "CLARIFICATION_REQUIRED",
+                "task_id": f"task-{uuid.uuid4().hex}",
+                "intent_id": task.intent_id,
+                "task_class": "resource",
+                "status": "CLARIFICATION_REQUIRED",
                 "reason_code": "UNKNOWN_ACADEMY_TOPIC",
                 "clarification_question": "I couldn't match that to a current Academy topic. Which financial concept would you like to explore?",
             }
@@ -545,11 +653,20 @@ def _plan_resource_task(
         workspace = task.entities.get("workspace") or task.slots.get("workspace")
         if workspace:
             aliases = application.get("navigation", {}).get("aliases", {})
-            resolved = next((target for alias, target in aliases.items() if _normalise(alias) == _normalise(workspace)), workspace)
+            resolved = next(
+                (
+                    target
+                    for alias, target in aliases.items()
+                    if _normalise(alias) == _normalise(workspace)
+                ),
+                workspace,
+            )
             if resolved not in application.get("workspaces", {}):
                 return {
-                    "task_id": f"task-{uuid.uuid4().hex}", "intent_id": task.intent_id,
-                    "task_class": "resource", "status": "CLARIFICATION_REQUIRED",
+                    "task_id": f"task-{uuid.uuid4().hex}",
+                    "intent_id": task.intent_id,
+                    "task_class": "resource",
+                    "status": "CLARIFICATION_REQUIRED",
                     "reason_code": "UNKNOWN_WORKSPACE_RESOURCE",
                     "clarification_question": "Which ORAIflow workspace would you like me to explain?",
                 }
@@ -573,8 +690,10 @@ def _plan_resource_task(
         },
     }
 
+
 def _canonicalize_semantic_field_locations(
-    task: InterpretedTask, execution_plan: dict[str, Any],
+    task: InterpretedTask,
+    execution_plan: dict[str, Any],
 ) -> tuple[InterpretedTask, list[str]]:
     """Move a recognized field to the location declared by its OCCF contract.
 
@@ -587,8 +706,12 @@ def _canonicalize_semantic_field_locations(
     """
     slots = dict(task.slots)
     entities = dict(task.entities)
-    plan_slots = set(execution_plan.get("required_slots", []) or []) | set(execution_plan.get("optional_slots", []) or [])
-    plan_entities = set(execution_plan.get("required_entities", []) or []) | set(execution_plan.get("optional_entities", []) or [])
+    plan_slots = set(execution_plan.get("required_slots", []) or []) | set(
+        execution_plan.get("optional_slots", []) or []
+    )
+    plan_entities = set(execution_plan.get("required_entities", []) or []) | set(
+        execution_plan.get("optional_entities", []) or []
+    )
     definitions = execution_plan.get("semantic_inputs", {})
     if isinstance(definitions, dict):
         for name, spec in definitions.items():
@@ -630,9 +753,17 @@ def _canonicalize_semantic_field_locations(
         # Reuse its supplied confidence in the canonical bucket only when the
         # model omitted that bucket's confidence; do not overwrite explicit
         # confidence values or invent a score.
-        if moved_slot_to_entity and task.entity_confidence is None and task.slot_confidence is not None:
+        if (
+            moved_slot_to_entity
+            and task.entity_confidence is None
+            and task.slot_confidence is not None
+        ):
             updates["entity_confidence"] = task.slot_confidence
-        if moved_entity_to_slot and task.slot_confidence is None and task.entity_confidence is not None:
+        if (
+            moved_entity_to_slot
+            and task.slot_confidence is None
+            and task.entity_confidence is not None
+        ):
             updates["slot_confidence"] = task.entity_confidence
         task = task.model_copy(update=updates)
     return task, []
@@ -651,53 +782,71 @@ def plan_interpreted_task(
     task_id = f"task-{uuid.uuid4().hex}"
     if task.intent_id not in registry.get("intents", {}):
         return {
-            "task_id": task_id, "intent_id": task.intent_id,
-            "status": "REJECTED", "reason_code": "UNKNOWN_INTENT",
+            "task_id": task_id,
+            "intent_id": task.intent_id,
+            "status": "REJECTED",
+            "reason_code": "UNKNOWN_INTENT",
             "clarification_question": "I couldn't match that request to a registered ORAIflow capability. Could you clarify what you would like to accomplish?",
         }
 
     known_message_ids = {
         str(getattr(item, "id", "")) for item in messages or () if getattr(item, "id", None)
     }
-    unresolved_references = [ref for ref in task.conversation_references if ref not in known_message_ids]
+    unresolved_references = [
+        ref for ref in task.conversation_references if ref not in known_message_ids
+    ]
     if unresolved_references:
         return {
-            "task_id": task_id, "intent_id": task.intent_id,
-            "status": "CLARIFICATION_REQUIRED", "reason_code": "CONVERSATION_REFERENCE_UNRESOLVED",
+            "task_id": task_id,
+            "intent_id": task.intent_id,
+            "status": "CLARIFICATION_REQUIRED",
+            "reason_code": "CONVERSATION_REFERENCE_UNRESOLVED",
             "clarification_question": "I couldn't reliably identify the earlier item you referred to. Could you point me to it again?",
         }
 
     if task.resolution == "ABSTAIN":
         return {
-            "task_id": task_id, "intent_id": task.intent_id,
-            "status": "CLARIFICATION_REQUIRED", "reason_code": "MODEL_ABSTAIN",
-            "clarification_question": task.clarification_question or "I'm not certain I understood. Could you describe what you'd like to do?",
+            "task_id": task_id,
+            "intent_id": task.intent_id,
+            "status": "CLARIFICATION_REQUIRED",
+            "reason_code": "MODEL_ABSTAIN",
+            "clarification_question": task.clarification_question
+            or "I'm not certain I understood. Could you describe what you'd like to do?",
         }
     task_class = classify_intent_task_class(task.intent_id, registry)
     dispatch = task_dispatch_for_class(task_class)
     if task_class == "resource":
         planned_resource = _plan_resource_task(task, sources=sources, registry=registry)
         planned_resource["model_resolution"] = task.resolution
-        planned_resource["model_clarification_reconciled"] = task.resolution == "NEEDS_CLARIFICATION" and planned_resource.get("status") == "RESOURCE_READY"
+        planned_resource["model_clarification_reconciled"] = (
+            task.resolution == "NEEDS_CLARIFICATION"
+            and planned_resource.get("status") == "RESOURCE_READY"
+        )
         return planned_resource
 
     capability_id = intent_validation_capability(task.intent_id, registry)
     if not capability_id:
         return {
-            "task_id": task_id, "intent_id": task.intent_id,
+            "task_id": task_id,
+            "intent_id": task.intent_id,
             "task_class": task_class,
-            "status": "REJECTED", "reason_code": "NO_REGISTERED_CAPABILITY_MAPPING",
+            "status": "REJECTED",
+            "reason_code": "NO_REGISTERED_CAPABILITY_MAPPING",
             "clarification_question": "I couldn't map that request to a registered ORAIflow capability or information resource. Could you clarify what outcome you need?",
         }
 
     intent = registry["intents"][task.intent_id]
     execution_plan = intent.get("execution_plan", {})
-    semantic_inputs = execution_plan.get("semantic_inputs", {}) if isinstance(execution_plan, dict) else {}
+    semantic_inputs = (
+        execution_plan.get("semantic_inputs", {}) if isinstance(execution_plan, dict) else {}
+    )
     task, location_conflicts = _canonicalize_semantic_field_locations(task, execution_plan)
     if location_conflicts:
         return {
-            "task_id": task_id, "intent_id": task.intent_id,
-            "task_class": task_class, "status": "REJECTED",
+            "task_id": task_id,
+            "intent_id": task.intent_id,
+            "task_class": task_class,
+            "status": "REJECTED",
             "reason_code": "CONFLICTING_SEMANTIC_FIELD_LOCATIONS",
             "missing_fields": location_conflicts,
             "clarification_question": "I found conflicting values for one of the requested details. Could you restate that detail?",
@@ -717,75 +866,108 @@ def plan_interpreted_task(
                 continue
             # Registered balance preferences remain preferences; only a name
             # that uniquely matches a context account is normalized as one.
-            if supplied_field == "source_account_preference" and supplied_value in {"highest_balance", "lowest_balance"}:
+            if supplied_field == "source_account_preference" and supplied_value in {
+                "highest_balance",
+                "lowest_balance",
+            }:
                 continue
             supplied_name = _normalise_account_reference(supplied_value)
             account_matches = [
-                item for item in context.get("accounts", [])
-                if isinstance(item, dict) and item.get("account_name")
+                item
+                for item in context.get("accounts", [])
+                if isinstance(item, dict)
+                and item.get("account_name")
                 and _normalise_account_reference(item.get("account_name")) == supplied_name
                 and supplied_name
             ]
             if len(account_matches) != 1:
                 continue
             canonical_name = str(account_matches[0].get("account_name", ""))
-            normalized_slots.pop("source_account_preference", None) if supplied_field == "source_account_preference" else None
+            (
+                normalized_slots.pop("source_account_preference", None)
+                if supplied_field == "source_account_preference"
+                else None
+            )
             normalized_slots["source_account"] = canonical_name
             normalized_evidence = [
-                TaskEvidence(
-                    field="source_account", source=item.source, quote=item.quote,
-                ) if item.field == supplied_field else item
+                (
+                    TaskEvidence(
+                        field="source_account",
+                        source=item.source,
+                        quote=item.quote,
+                    )
+                    if item.field == supplied_field
+                    else item
+                )
                 for item in normalized_evidence
             ]
             changed = True
             break
         if changed:
-            task = task.model_copy(update={"slots": normalized_slots, "evidence": normalized_evidence})
+            task = task.model_copy(
+                update={"slots": normalized_slots, "evidence": normalized_evidence}
+            )
 
     # Optional and required semantic inputs belong to the OCCF intent contract.
     # Do not silently accept model-invented fields or unsupported enum values.
-    declared_slots = set(execution_plan.get("required_slots", [])) | set(execution_plan.get("optional_slots", []))
+    declared_slots = set(execution_plan.get("required_slots", [])) | set(
+        execution_plan.get("optional_slots", [])
+    )
     declared_slots.update(
-        field_name for field_name, spec in semantic_inputs.items()
+        field_name
+        for field_name, spec in semantic_inputs.items()
         if isinstance(spec, dict) and spec.get("location", "slots") == "slots"
     )
     if declared_slots:
         unexpected_slots = sorted(set(task.slots) - declared_slots)
         if unexpected_slots:
             return {
-                "task_id": task_id, "intent_id": task.intent_id,
-                "task_class": task_class, "status": "REJECTED",
+                "task_id": task_id,
+                "intent_id": task.intent_id,
+                "task_class": task_class,
+                "status": "REJECTED",
                 "reason_code": "UNDECLARED_INTENT_SLOT",
                 "missing_fields": unexpected_slots,
                 "clarification_question": "I understood the request, but one of the details does not match the registered workflow inputs. Could you restate that detail?",
             }
-    declared_entities = set(execution_plan.get("required_entities", [])) | set(execution_plan.get("optional_entities", []))
+    declared_entities = set(execution_plan.get("required_entities", [])) | set(
+        execution_plan.get("optional_entities", [])
+    )
     declared_entities.update(
-        field_name for field_name, spec in semantic_inputs.items()
+        field_name
+        for field_name, spec in semantic_inputs.items()
         if isinstance(spec, dict) and spec.get("location") == "entities"
     )
     if declared_entities:
         unexpected_entities = sorted(set(task.entities) - declared_entities)
         if unexpected_entities:
             return {
-                "task_id": task_id, "intent_id": task.intent_id,
-                "task_class": task_class, "status": "REJECTED",
+                "task_id": task_id,
+                "intent_id": task.intent_id,
+                "task_class": task_class,
+                "status": "REJECTED",
                 "reason_code": "UNDECLARED_INTENT_ENTITY",
                 "missing_fields": unexpected_entities,
                 "clarification_question": "I understood the request, but one of the referenced items is not a supported workflow input. Could you clarify that detail?",
             }
     model_entity_fields = set(task.entities)
     task, extracted_entity_fields = _extract_registered_entities(
-        task, execution_plan, customer_text=str(sources.get("current_turn", "")),
+        task,
+        execution_plan,
+        customer_text=str(sources.get("current_turn", "")),
     )
     task = _apply_registered_semantic_evidence(
-        task, execution_plan, customer_text=str(sources.get("current_turn", "")),
+        task,
+        execution_plan,
+        customer_text=str(sources.get("current_turn", "")),
     )
     for field_name, allowed_values in execution_plan.get("slot_values", {}).items():
         if field_name in task.slots and task.slots[field_name] not in allowed_values:
             return {
-                "task_id": task_id, "intent_id": task.intent_id,
-                "task_class": task_class, "status": "CLARIFICATION_REQUIRED",
+                "task_id": task_id,
+                "intent_id": task.intent_id,
+                "task_class": task_class,
+                "status": "CLARIFICATION_REQUIRED",
                 "reason_code": "INTENT_SLOT_VALUE_UNSUPPORTED",
                 "missing_fields": [field_name],
                 "clarification_question": f"I can apply a supported {field_name.replace('_', ' ')} preference, but I couldn't validate the value provided. Could you clarify it?",
@@ -793,12 +975,16 @@ def plan_interpreted_task(
     # In an intent-only protocol, capability mapping is runtime-owned. The
     # capability-selection confidence dimension is therefore not applicable.
     assessment_payload = _assessment_for_capability(task, capability_id)
-    configured_dimensions = set(dispatch.applicable_confidence_dimensions) if dispatch else {"intent", "slot", "entity"}
+    configured_dimensions = (
+        set(dispatch.applicable_confidence_dimensions) if dispatch else {"intent", "slot", "entity"}
+    )
     applicable_dimensions = {"intent"} if "intent" in configured_dimensions else set()
     if "slot" in configured_dimensions and (task.slots or execution_plan.get("required_slots")):
         applicable_dimensions.add("slot")
     model_supplied_entities = model_entity_fields | (set(task.entities) - extracted_entity_fields)
-    if "entity" in configured_dimensions and (model_supplied_entities or execution_plan.get("required_entities")):
+    if "entity" in configured_dimensions and (
+        model_supplied_entities or execution_plan.get("required_entities")
+    ):
         applicable_dimensions.add("entity")
     assessment, decision = validate_interpretation_assessment(
         assessment_payload,
@@ -809,10 +995,10 @@ def plan_interpreted_task(
     )
     if decision.get("decision") != "PASS":
         missing_task_fields = [
-            field for field in execution_plan.get("required_slots", [])
-            if field not in task.slots
+            field for field in execution_plan.get("required_slots", []) if field not in task.slots
         ] + [
-            field for field in execution_plan.get("required_entities", [])
+            field
+            for field in execution_plan.get("required_entities", [])
             if field not in task.entities
         ]
         reported_fields = list(decision.get("fields", []) or decision.get("dimensions", []))
@@ -821,20 +1007,30 @@ def plan_interpreted_task(
         return {
             "task_id": task_id,
             "intent_id": task.intent_id,
-            "status": "CLARIFICATION_REQUIRED" if decision.get("decision") in {"CLARIFY", "ABSTAIN"} else "REJECTED",
+            "status": (
+                "CLARIFICATION_REQUIRED"
+                if decision.get("decision") in {"CLARIFY", "ABSTAIN"}
+                else "REJECTED"
+            ),
             "reason_code": str(decision.get("code", "ASSESSMENT_REJECTED")),
             "missing_fields": reported_fields,
             "clarification_question": task.clarification_question,
             "validation": decision,
         }
 
-    semantic_values, missing_semantic_inputs, unsupported_semantic_inputs = _resolve_semantic_inputs(
-        task, execution_plan, customer_text=str(sources.get("current_turn", "")),
+    semantic_values, missing_semantic_inputs, unsupported_semantic_inputs = (
+        _resolve_semantic_inputs(
+            task,
+            execution_plan,
+            customer_text=str(sources.get("current_turn", "")),
+        )
     )
     if unsupported_semantic_inputs:
         return {
-            "task_id": task_id, "intent_id": task.intent_id,
-            "task_class": task_class, "status": "CLARIFICATION_REQUIRED",
+            "task_id": task_id,
+            "intent_id": task.intent_id,
+            "task_class": task_class,
+            "status": "CLARIFICATION_REQUIRED",
             "reason_code": "INTENT_SEMANTIC_VALUE_UNSUPPORTED",
             "missing_fields": unsupported_semantic_inputs,
             "clarification_question": "I understood the requested selection, but this operation does not support that option. Could you choose a supported item or selection?",
@@ -842,10 +1038,16 @@ def plan_interpreted_task(
         }
     if missing_semantic_inputs:
         labels = [str(field).replace("_", " ") for field in missing_semantic_inputs]
-        question = "I need " + " and ".join(labels) + " before I can continue. Could you provide that detail?"
+        question = (
+            "I need "
+            + " and ".join(labels)
+            + " before I can continue. Could you provide that detail?"
+        )
         return {
-            "task_id": task_id, "intent_id": task.intent_id,
-            "task_class": task_class, "status": "CLARIFICATION_REQUIRED",
+            "task_id": task_id,
+            "intent_id": task.intent_id,
+            "task_class": task_class,
+            "status": "CLARIFICATION_REQUIRED",
             "reason_code": "SEMANTIC_REQUIRED_FIELD_MISSING",
             "missing_fields": missing_semantic_inputs,
             "clarification_question": question,
@@ -855,31 +1057,41 @@ def plan_interpreted_task(
     # Semantic required fields are declared on the OCCF intent execution plan.
     # They are validated independently from the capability's input schema.
     missing_semantic_fields = [
-        field for field in execution_plan.get("required_slots", [])
-        if field not in task.slots
+        field for field in execution_plan.get("required_slots", []) if field not in task.slots
     ] + [
-        field for field in execution_plan.get("required_entities", [])
-        if field not in task.entities
+        field for field in execution_plan.get("required_entities", []) if field not in task.entities
     ]
     if missing_semantic_fields:
         labels = [str(field).replace("_", " ") for field in missing_semantic_fields]
-        question = "I need " + " and ".join(labels) + " before I can continue. Could you provide that detail?"
+        question = (
+            "I need "
+            + " and ".join(labels)
+            + " before I can continue. Could you provide that detail?"
+        )
         return {
-            "task_id": task_id, "intent_id": task.intent_id,
-            "status": "CLARIFICATION_REQUIRED", "reason_code": "SEMANTIC_REQUIRED_FIELD_MISSING",
+            "task_id": task_id,
+            "intent_id": task.intent_id,
+            "status": "CLARIFICATION_REQUIRED",
+            "reason_code": "SEMANTIC_REQUIRED_FIELD_MISSING",
             "missing_fields": missing_semantic_fields,
             "clarification_question": question,
             "capability_id": capability_id,
         }
 
     arguments, clarification, missing_schema_fields = _arguments_for_capability(
-        task, capability_id, context=context, registry=registry, plan=execution_plan,
+        task,
+        capability_id,
+        context=context,
+        registry=registry,
+        plan=execution_plan,
         semantic_values=semantic_values,
     )
     if clarification:
         return {
-            "task_id": task_id, "intent_id": task.intent_id,
-            "status": "CLARIFICATION_REQUIRED", "reason_code": "REQUIRED_INPUT_MISSING",
+            "task_id": task_id,
+            "intent_id": task.intent_id,
+            "status": "CLARIFICATION_REQUIRED",
+            "reason_code": "REQUIRED_INPUT_MISSING",
             "clarification_question": clarification,
             "missing_fields": missing_schema_fields,
             "capability_id": capability_id,
@@ -889,21 +1101,27 @@ def plan_interpreted_task(
     capability = registry.get("capabilities", {}).get(capability_id, {})
     if capability.get("authorization", {}).get("agent_invocable") is not True:
         return {
-            "task_id": task_id, "intent_id": task.intent_id,
-            "status": "REJECTED", "reason_code": "CAPABILITY_NOT_AGENT_INVOKABLE",
+            "task_id": task_id,
+            "intent_id": task.intent_id,
+            "status": "REJECTED",
+            "reason_code": "CAPABILITY_NOT_AGENT_INVOKABLE",
             "clarification_question": "That request is not available through the ORAIflow assistant.",
         }
     kind = capability.get("kind")
     if kind == "mcp" and capability.get("execution", {}).get("effect") not in {"read", "read_only"}:
         return {
-            "task_id": task_id, "intent_id": task.intent_id,
-            "status": "REJECTED", "reason_code": "NON_READ_MCP_CAPABILITY",
+            "task_id": task_id,
+            "intent_id": task.intent_id,
+            "status": "REJECTED",
+            "reason_code": "NON_READ_MCP_CAPABILITY",
             "clarification_question": "I can't execute that financial operation. I can help prepare supported actions through their separately approved workflow.",
         }
     if kind == "frontend" and capability.get("execution", {}).get("model_invocable") is not True:
         return {
-            "task_id": task_id, "intent_id": task.intent_id,
-            "status": "REJECTED", "reason_code": "FRONTEND_ACTION_NOT_MODEL_INVOKABLE",
+            "task_id": task_id,
+            "intent_id": task.intent_id,
+            "status": "REJECTED",
+            "reason_code": "FRONTEND_ACTION_NOT_MODEL_INVOKABLE",
             "clarification_question": "That action must be completed through its separately guarded workflow.",
         }
 
@@ -927,7 +1145,8 @@ def plan_interpreted_task(
         "semantic_values": semantic_values,
         "assessment": assessment.model_dump(mode="json") if assessment else assessment_payload,
         "presentation_id": execution_plan.get("presentation"),
-        "response_mode": execution_plan.get("response_mode") or ("presentation" if execution_plan.get("presentation") else "grounded_explanation"),
+        "response_mode": execution_plan.get("response_mode")
+        or ("presentation" if execution_plan.get("presentation") else "grounded_explanation"),
         "execution_plan": execution_plan,
         "applicable_confidence_dimensions": sorted(applicable_dimensions),
         "model_resolution": task.resolution,
@@ -955,7 +1174,8 @@ def assessment_tool_arguments(task: dict[str, Any]) -> dict[str, Any]:
         "orai_entities": assessment.get("entities", {}),
         "orai_evidence": [
             f"{item.get('field')}|{item.get('source')}|{item.get('quote')}"
-            for item in evidence if isinstance(item, dict)
+            for item in evidence
+            if isinstance(item, dict)
         ],
         "orai_clarification_question": assessment.get("clarification_question"),
     }

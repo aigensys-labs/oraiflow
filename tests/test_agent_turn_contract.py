@@ -18,15 +18,17 @@ def test_agent_turn_context_is_versioned_and_rejects_unregistered_shape_fields()
         available_mcp_capability_ids=("banking.transactions.recent",),
         available_frontend_capability_ids=("frontend.workspace.navigate",),
         available_presentation_ids=("PRESENTATION_RECENT_TRANSACTIONS",),
-        intent_candidates=(AgentIntentCandidate(
-            intent_id="RECENT_TRANSACTIONS",
-            description="Retrieve recent activity.",
-            capability_id="banking.transactions.recent",
-            capability_name="get_recent_transactions",
-            response_mode="presentation",
-            match_kind="semantic_phrase",
-            score=1108,
-        ),),
+        intent_candidates=(
+            AgentIntentCandidate(
+                intent_id="RECENT_TRANSACTIONS",
+                description="Retrieve recent activity.",
+                capability_id="banking.transactions.recent",
+                capability_name="get_recent_transactions",
+                response_mode="presentation",
+                match_kind="semantic_phrase",
+                score=1108,
+            ),
+        ),
     )
     assert context.schema_version == "1.1.0"
     assert context.intent_candidates[0].intent_id == "RECENT_TRANSACTIONS"
@@ -57,7 +59,9 @@ def test_agent_turn_response_receipt_preserves_message_identity_content_and_meta
         "failed_frontend_actions": [],
     }
     response = attach_agent_turn_response(message, turn_id="turn-example-001", outcome=outcome)
-    receipt = AgentTurnResponse.model_validate(response.additional_kwargs["oraiflow_agent_turn_response"])
+    receipt = AgentTurnResponse.model_validate(
+        response.additional_kwargs["oraiflow_agent_turn_response"]
+    )
     assert response.id == "assistant-message-123"
     assert response.content == message.content
     assert response.additional_kwargs["provider_metadata"] == {"finish_reason": "stop"}
@@ -90,7 +94,9 @@ def test_agent_turn_response_marks_registered_tool_proposals_as_not_finalized():
             "failed_frontend_actions": [],
         },
     )
-    receipt = AgentTurnResponse.model_validate(response.additional_kwargs["oraiflow_agent_turn_response"])
+    receipt = AgentTurnResponse.model_validate(
+        response.additional_kwargs["oraiflow_agent_turn_response"]
+    )
     assert receipt.response_kind == "CAPABILITY_REQUEST"
     assert receipt.finalized is False
 
@@ -212,7 +218,9 @@ def test_agent_turn_response_classifies_ui_actions_from_registry_not_name_denyli
             "failed_frontend_actions": [],
         },
     )
-    receipt = AgentTurnResponse.model_validate(response.additional_kwargs["oraiflow_agent_turn_response"])
+    receipt = AgentTurnResponse.model_validate(
+        response.additional_kwargs["oraiflow_agent_turn_response"]
+    )
     assert receipt.response_kind == "FRONTEND_ACTION_REQUEST"
     assert receipt.finalized is False
 
@@ -233,8 +241,12 @@ def test_agent_turn_response_assigns_unique_message_identity_when_runtime_messag
     }
     first_response = attach_agent_turn_response(first, turn_id="same-human-turn", outcome=outcome)
     second_response = attach_agent_turn_response(second, turn_id="same-human-turn", outcome=outcome)
-    first_receipt = AgentTurnResponse.model_validate(first_response.additional_kwargs["oraiflow_agent_turn_response"])
-    second_receipt = AgentTurnResponse.model_validate(second_response.additional_kwargs["oraiflow_agent_turn_response"])
+    first_receipt = AgentTurnResponse.model_validate(
+        first_response.additional_kwargs["oraiflow_agent_turn_response"]
+    )
+    second_receipt = AgentTurnResponse.model_validate(
+        second_response.additional_kwargs["oraiflow_agent_turn_response"]
+    )
     assert first_receipt.message_id == first_response.id
     assert second_receipt.message_id == second_response.id
     assert first_response.id != second_response.id

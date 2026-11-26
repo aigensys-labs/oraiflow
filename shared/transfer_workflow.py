@@ -6,6 +6,7 @@ grammar, then advances only through registered capabilities and trusted
 contact/account candidates returned by authenticated MCP reads. It never
 selects a beneficiary or authorizes a payment on its own.
 """
+
 from __future__ import annotations
 
 import re
@@ -45,7 +46,11 @@ def _money_string(value: Any) -> str:
 
 
 def _account_alias(value: str) -> str:
-    words = [word for word in _normalise(value).split() if word not in {"account", "my", "the", "from", "use", "using", "please"}]
+    words = [
+        word
+        for word in _normalise(value).split()
+        if word not in {"account", "my", "the", "from", "use", "using", "please"}
+    ]
     return " ".join(words)
 
 
@@ -57,17 +62,23 @@ def _source_account_preference(answer: str) -> str | None:
     account, and the resulting preference is applied to authenticated MCP rows.
     """
     value = re.sub(r"[^a-z0-9]+", " ", _normalise(answer)).strip()
-    if re.search(r"\b(?:not|dont|do not|rather than|instead of)\s+(?:the\s+)?(?:highest|largest|most|maximum|lowest|smallest|least|minimum)\b", value):
+    if re.search(
+        r"\b(?:not|dont|do not|rather than|instead of)\s+(?:the\s+)?(?:highest|largest|most|maximum|lowest|smallest|least|minimum)\b",
+        value,
+    ):
         return None
     padded = f" {value} "
-    aliases = get_registry().get("application_policy", {}).get("transfer_source_preference_aliases", {})
+    aliases = (
+        get_registry().get("application_policy", {}).get("transfer_source_preference_aliases", {})
+    )
     matches = []
     for preference, phrases in aliases.items():
         if preference not in {"highest_balance", "lowest_balance"} or not isinstance(phrases, list):
             continue
         if any(
             f" {re.sub(r'[^a-z0-9]+', ' ', _normalise(phrase)).strip()} " in padded
-            for phrase in phrases if _normalise(phrase)
+            for phrase in phrases
+            if _normalise(phrase)
         ):
             matches.append(preference)
     return matches[0] if len(matches) == 1 else None
@@ -76,14 +87,20 @@ def _source_account_preference(answer: str) -> str | None:
 def _without_source_preference(answer: str) -> str:
     """Remove a registered source preference before resolving a contact choice."""
     value = str(answer or "")
-    aliases = get_registry().get("application_policy", {}).get("transfer_source_preference_aliases", {})
+    aliases = (
+        get_registry().get("application_policy", {}).get("transfer_source_preference_aliases", {})
+    )
     for preference in ("highest_balance", "lowest_balance"):
         phrases = aliases.get(preference, [])
         for phrase in sorted((str(item) for item in phrases if item), key=len, reverse=True):
             words = re.sub(r"[^a-z0-9]+", " ", _normalise(phrase)).strip().split()
             if not words:
                 continue
-            pattern = r"(?<![a-z0-9])" + r"[\W_]+".join(re.escape(word) for word in words) + r"(?![a-z0-9])"
+            pattern = (
+                r"(?<![a-z0-9])"
+                + r"[\W_]+".join(re.escape(word) for word in words)
+                + r"(?![a-z0-9])"
+            )
             value = re.sub(pattern, " ", value, flags=re.I)
     value = re.sub(r"\b(?:and|also|use|using|from|with)\b", " ", value, flags=re.I)
     return " ".join(value.split()).strip(" ,;:.")
@@ -92,7 +109,8 @@ def _without_source_preference(answer: str) -> str:
 def _eligible_accounts(context: dict[str, Any], currency: str) -> list[dict[str, Any]]:
     accounts = context.get("accounts") if isinstance(context, dict) else []
     return [
-        dict(item) for item in accounts or []
+        dict(item)
+        for item in accounts or []
         if isinstance(item, dict)
         and item.get("account_id")
         and str(item.get("currency", "")).upper() == currency.upper()
@@ -119,8 +137,10 @@ def _account_by_preference(
         # `Everyday account`. Matching is unique within the currency candidates.
         query_alias = _account_alias(normalized)
         alias_matches = [
-            account for account in accounts
-            if query_alias and (
+            account
+            for account in accounts
+            if query_alias
+            and (
                 query_alias == _account_alias(account.get("account_name", ""))
                 or query_alias in _account_alias(account.get("account_name", "")).split()
                 or _account_alias(account.get("account_name", "")) in query_alias.split()
@@ -132,14 +152,34 @@ def _account_by_preference(
             return None, "AMBIGUOUS_ACCOUNT_MATCH"
 
         ordinal = re.fullmatch(r"(?:option\s*)?(\d{1,2})", normalized)
-        ordinal_value = int(ordinal.group(1)) if ordinal else {
-            "first": 1, "first one": 1, "the first": 1, "the first one": 1,
-            "second": 2, "second one": 2, "the second": 2, "the second one": 2,
-            "third": 3, "third one": 3, "the third": 3, "the third one": 3,
-            "fourth": 4, "fourth one": 4, "the fourth": 4, "the fourth one": 4,
-        }.get(normalized)
+        ordinal_value = (
+            int(ordinal.group(1))
+            if ordinal
+            else {
+                "first": 1,
+                "first one": 1,
+                "the first": 1,
+                "the first one": 1,
+                "second": 2,
+                "second one": 2,
+                "the second": 2,
+                "the second one": 2,
+                "third": 3,
+                "third one": 3,
+                "the third": 3,
+                "the third one": 3,
+                "fourth": 4,
+                "fourth one": 4,
+                "the fourth": 4,
+                "the fourth one": 4,
+            }.get(normalized)
+        )
         if ordinal_value is not None:
-            return (str(accounts[ordinal_value - 1]["account_id"]), "ACCOUNT_ORDINAL") if 1 <= ordinal_value <= len(accounts) else (None, "ACCOUNT_ORDINAL_OUT_OF_RANGE")
+            return (
+                (str(accounts[ordinal_value - 1]["account_id"]), "ACCOUNT_ORDINAL")
+                if 1 <= ordinal_value <= len(accounts)
+                else (None, "ACCOUNT_ORDINAL_OUT_OF_RANGE")
+            )
 
         preference = _source_account_preference(normalized)
         if preference:
@@ -152,17 +192,30 @@ def _account_by_preference(
 
 
 def build_transfer_workflow(
-    assessment: dict[str, Any], context: dict[str, Any], *, workflow_id: str | None = None,
+    assessment: dict[str, Any],
+    context: dict[str, Any],
+    *,
+    workflow_id: str | None = None,
 ) -> dict[str, Any]:
     """Create workflow state from a validated LLM assessment, never raw prompt parsing."""
     slots = assessment.get("slots") if isinstance(assessment.get("slots"), dict) else {}
     entities = assessment.get("entities") if isinstance(assessment.get("entities"), dict) else {}
-    beneficiary = str(entities.get("beneficiary") or entities.get("recipient") or slots.get("beneficiary") or slots.get("recipient") or "").strip()
+    beneficiary = str(
+        entities.get("beneficiary")
+        or entities.get("recipient")
+        or slots.get("beneficiary")
+        or slots.get("recipient")
+        or ""
+    ).strip()
     amount = _money_string(slots.get("amount"))
     currency = str(slots.get("currency") or "").upper().strip()
     source_query = str(slots.get("source_account") or slots.get("from_account") or "").strip()
     raw_preference = str(slots.get("source_account_preference") or "").strip().lower()
-    source_preference = raw_preference if raw_preference in {"highest_balance", "lowest_balance"} else (_source_account_preference(raw_preference) or "")
+    source_preference = (
+        raw_preference
+        if raw_preference in {"highest_balance", "lowest_balance"}
+        else (_source_account_preference(raw_preference) or "")
+    )
     source_account_id = ""
     selected_id = context.get("selected_account_id") if isinstance(context, dict) else None
     # A selected UI account is not evidence of the transfer currency. Preserve
@@ -188,14 +241,17 @@ def build_transfer_workflow(
         # ranking cannot run until a unique recipient and an explicit currency
         # have been established.
         workflow["account_resolution_reason"] = (
-            "NEEDS_VERIFIED_BALANCE_MAX" if source_preference == "highest_balance"
+            "NEEDS_VERIFIED_BALANCE_MAX"
+            if source_preference == "highest_balance"
             else "NEEDS_VERIFIED_BALANCE_MIN"
         )
     # Resolve a directly named account against the current account catalogue.
     elif source_query and currency:
         accounts = _eligible_accounts(context, currency)
         account_id, _reason = _account_by_preference(
-            source_query, accounts, allow_unique_fallback=False,
+            source_query,
+            accounts,
+            allow_unique_fallback=False,
         )
         if account_id:
             workflow["source_account_id"] = account_id
@@ -203,7 +259,10 @@ def build_transfer_workflow(
 
 
 def build_explicit_transfer_workflow(
-    customer_text: str, context: dict[str, Any] | None = None, *, workflow_id: str | None = None,
+    customer_text: str,
+    context: dict[str, Any] | None = None,
+    *,
+    workflow_id: str | None = None,
 ) -> dict[str, Any] | None:
     """Build a bounded transfer workflow from an explicit amount/recipient request.
 
@@ -214,13 +273,18 @@ def build_explicit_transfer_workflow(
     """
     text = str(customer_text or "").strip()
     # Explanatory questions about how to make a transfer must remain educational.
-    if re.search(r"\b(?:how\s+(?:do\s+i|can\s+i|to)|what\s+if|explain|teach\s+me)\b", text, re.IGNORECASE):
+    if re.search(
+        r"\b(?:how\s+(?:do\s+i|can\s+i|to)|what\s+if|explain|teach\s+me)\b", text, re.IGNORECASE
+    ):
         return None
     parsed = extract_contact_transfer_request(text, context or {}, allow_currency_missing=True)
     if not parsed:
         return None
     source_preference = _source_account_preference(text)
-    slots: dict[str, Any] = {"amount": parsed.get("amount"), "currency": parsed.get("currency") or ""}
+    slots: dict[str, Any] = {
+        "amount": parsed.get("amount"),
+        "currency": parsed.get("currency") or "",
+    }
     if parsed.get("from_account_id"):
         slots["source_account_id"] = parsed["from_account_id"]
     source_clause = re.search(r"\b(?:from|using|out of)\s+(.+?)\s*[.!?]*$", text, re.IGNORECASE)
@@ -248,8 +312,11 @@ def workflow_from_message(message: Any) -> dict[str, Any] | None:
         # A typed task envelope is authoritative even when it belongs to a
         # different domain or is terminal. Never fall through to stale legacy
         # transfer metadata copied onto a navigation/education response.
-        if (task.domain == "transfer" and task.status == "ACTIVE"
-                and isinstance(task.state.get("workflow"), dict)):
+        if (
+            task.domain == "transfer"
+            and task.status == "ACTIVE"
+            and isinstance(task.state.get("workflow"), dict)
+        ):
             return dict(task.state["workflow"])
         return None
     # Read-only compatibility for conversations persisted before the shared
@@ -267,8 +334,10 @@ def latest_pending_workflow(messages: list[Any]) -> dict[str, Any] | None:
     a transfer just because an old checkpoint also contains transfer metadata.
     """
     items = list(messages or [])
-    latest_human = max((i for i, item in enumerate(items) if message_type(item) == "human"), default=-1)
-    after = [item for item in items[latest_human + 1:] if message_type(item) == "ai"]
+    latest_human = max(
+        (i for i, item in enumerate(items) if message_type(item) == "human"), default=-1
+    )
+    after = [item for item in items[latest_human + 1 :] if message_type(item) == "ai"]
     before = [item for item in items[:latest_human] if message_type(item) == "ai"]
     owner = after[-1] if after else (before[-1] if before else None)
     if owner is None:
@@ -276,8 +345,11 @@ def latest_pending_workflow(messages: list[Any]) -> dict[str, Any] | None:
 
     typed_task = pending_task_from_message(owner)
     if typed_task is not None:
-        if (typed_task.domain == "transfer" and typed_task.status == "ACTIVE"
-                and isinstance(typed_task.state.get("workflow"), dict)):
+        if (
+            typed_task.domain == "transfer"
+            and typed_task.status == "ACTIVE"
+            and isinstance(typed_task.state.get("workflow"), dict)
+        ):
             return dict(typed_task.state["workflow"])
         return None
 
@@ -290,7 +362,15 @@ def latest_pending_workflow(messages: list[Any]) -> dict[str, Any] | None:
 def with_workflow(message: Any, workflow: dict[str, Any]) -> Any:
     """Attach a serialized transfer workflow snapshot to a message."""
     stage = str(workflow.get("stage", ""))
-    terminal = stage in {"CANCELLED", "CONTACT_NOT_FOUND", "CONTACT_SEARCH_FAILED", "DRAFT_REJECTED", "DISMISSED", "DRAFT_OPENED", "COMPLETED"}
+    terminal = stage in {
+        "CANCELLED",
+        "CONTACT_NOT_FOUND",
+        "CONTACT_SEARCH_FAILED",
+        "DRAFT_REJECTED",
+        "DISMISSED",
+        "DRAFT_OPENED",
+        "COMPLETED",
+    }
     task = PendingTaskContext(
         task_id=str(workflow.get("workflow_id") or f"transfer-{uuid.uuid4().hex}"),
         domain="transfer",
@@ -303,11 +383,17 @@ def with_workflow(message: Any, workflow: dict[str, Any]) -> Any:
 
 
 def resolve_search_result(
-    workflow: dict[str, Any], candidates: list[dict[str, Any]], context: dict[str, Any],
+    workflow: dict[str, Any],
+    candidates: list[dict[str, Any]],
+    context: dict[str, Any],
 ) -> tuple[str, dict[str, Any]]:
     """Resolve an authenticated contact search into a pending or ready workflow."""
     updated = dict(workflow)
-    active = [item for item in candidates if isinstance(item, dict) and item.get("status", "ACTIVE") == "ACTIVE"]
+    active = [
+        item
+        for item in candidates
+        if isinstance(item, dict) and item.get("status", "ACTIVE") == "ACTIVE"
+    ]
     if not active:
         updated["stage"] = "CONTACT_NOT_FOUND"
         return "CONTACT_NOT_FOUND", updated
@@ -322,7 +408,9 @@ def resolve_search_result(
     return _complete_or_ask_account(updated, context)
 
 
-def _complete_or_ask_account(workflow: dict[str, Any], context: dict[str, Any]) -> tuple[str, dict[str, Any]]:
+def _complete_or_ask_account(
+    workflow: dict[str, Any], context: dict[str, Any]
+) -> tuple[str, dict[str, Any]]:
     updated = dict(workflow)
     contact = updated.get("contact") or {}
     amount = _money_string(updated.get("amount"))
@@ -348,11 +436,17 @@ def _complete_or_ask_account(workflow: dict[str, Any], context: dict[str, Any]) 
             ]
         updated["stage"] = "AWAITING_CURRENCY"
         return "AWAITING_CURRENCY", updated
-    if str(contact.get("currency", "")).upper() and str(contact.get("currency", "")).upper() != currency:
+    if (
+        str(contact.get("currency", "")).upper()
+        and str(contact.get("currency", "")).upper() != currency
+    ):
         updated["stage"] = "CURRENCY_MISMATCH"
         return "CURRENCY_MISMATCH", updated
     updated["currency"] = currency
-    if str(updated.get("source_account_preference", "")).lower() in {"highest_balance", "lowest_balance"}:
+    if str(updated.get("source_account_preference", "")).lower() in {
+        "highest_balance",
+        "lowest_balance",
+    }:
         criterion = "MAX" if updated["source_account_preference"] == "highest_balance" else "MIN"
         updated["account_resolution_reason"] = f"NEEDS_VERIFIED_BALANCE_{criterion}"
         updated["stage"] = "RESOLVING_SOURCE_ACCOUNT"
@@ -370,7 +464,9 @@ def _complete_or_ask_account(workflow: dict[str, Any], context: dict[str, Any]) 
     # silently substituting another funding account.
     if updated.get("source_account_query"):
         matched_id, reason = _account_by_preference(
-            str(updated["source_account_query"]), accounts, allow_unique_fallback=False,
+            str(updated["source_account_query"]),
+            accounts,
+            allow_unique_fallback=False,
         )
         if matched_id:
             updated["source_account_id"] = matched_id
@@ -396,7 +492,9 @@ def _complete_or_ask_account(workflow: dict[str, Any], context: dict[str, Any]) 
 
 
 def resolve_contact_reply(
-    workflow: dict[str, Any], answer: str, context: dict[str, Any],
+    workflow: dict[str, Any],
+    answer: str,
+    context: dict[str, Any],
 ) -> tuple[str, dict[str, Any]]:
     """Apply a customer reply to the pending contact-selection stage of a transfer."""
     updated = dict(workflow)
@@ -413,11 +511,15 @@ def resolve_contact_reply(
         updated["source_account_preference"] = preference
     known_currency = str(updated.get("currency") or "").upper()
     if known_currency:
-        account_id, reason = _account_by_preference(answer, _eligible_accounts(context, known_currency))
+        account_id, reason = _account_by_preference(
+            answer, _eligible_accounts(context, known_currency)
+        )
         if account_id:
             updated["source_account_id"] = account_id
         elif reason.startswith("NEEDS_VERIFIED_BALANCE_"):
-            updated["source_account_preference"] = "highest_balance" if reason.endswith("_MAX") else "lowest_balance"
+            updated["source_account_preference"] = (
+                "highest_balance" if reason.endswith("_MAX") else "lowest_balance"
+            )
             updated["account_resolution_reason"] = reason
 
     contact_answer = _without_source_preference(answer) if preference else answer
@@ -452,11 +554,14 @@ def currency_choice_prompt(workflow: dict[str, Any]) -> str:
     contact = workflow.get("contact") or {}
     proposed = str(workflow.get("proposed_currency") or contact.get("currency") or "").upper()
     amount = str(workflow.get("amount") or "")
-    recipient = str(contact.get("full_name") or workflow.get("beneficiary_query") or "the saved recipient")
+    recipient = str(
+        contact.get("full_name") or workflow.get("beneficiary_query") or "the saved recipient"
+    )
     source_query = str(workflow.get("source_account_query") or "").strip()
     source_preference = str(workflow.get("source_account_preference") or "").strip()
     accounts = [
-        item for item in (workflow.get("source_account_candidates") or [])
+        item
+        for item in (workflow.get("source_account_candidates") or [])
         if isinstance(item, dict) and str(item.get("currency", proposed)).upper() == proposed
     ]
     choices = "\n".join(
@@ -468,27 +573,29 @@ def currency_choice_prompt(workflow: dict[str, Any]) -> str:
             source_instruction = (
                 f"Your requested source is **{source_query}**; I will verify that exact account."
             )
-            currency_instruction = f"Reply **yes** to confirm {proposed}, or specify another supported currency."
+            currency_instruction = (
+                f"Reply **yes** to confirm {proposed}, or specify another supported currency."
+            )
         elif source_preference in {"highest_balance", "lowest_balance"}:
             label = "highest" if source_preference == "highest_balance" else "lowest"
-            source_instruction = f"I will apply your {label}-balance preference using freshly verified balances."
-            currency_instruction = f"Reply **yes** to confirm {proposed}, or specify another supported currency."
+            source_instruction = (
+                f"I will apply your {label}-balance preference using freshly verified balances."
+            )
+            currency_instruction = (
+                f"Reply **yes** to confirm {proposed}, or specify another supported currency."
+            )
         elif choices:
             source_instruction = (
                 "Choose the account that should fund it, or say **highest balance** "
                 "and I will compare fresh verified balances:\n\n" + choices
             )
-            currency_instruction = (
-                f"Your account choice confirms {proposed}; tell me if you need a different supported currency."
-            )
+            currency_instruction = f"Your account choice confirms {proposed}; tell me if you need a different supported currency."
         else:
             source_instruction = (
                 "Choose the ORAIflow account that should fund it, or say **highest balance** "
                 "and I will compare fresh verified balances."
             )
-            currency_instruction = (
-                f"Your account choice confirms {proposed}; tell me if you need a different supported currency."
-            )
+            currency_instruction = f"Your account choice confirms {proposed}; tell me if you need a different supported currency."
         return (
             f"I found **{recipient}**. The saved recipient account uses **{proposed}**. "
             f"I can prepare **{amount} {proposed}**. {source_instruction}\n\n"
@@ -509,15 +616,21 @@ def _remaining_source_choice_text(answer: str) -> str:
     value = _normalise(answer)
     value = re.sub(
         r"^(?:yes|yeah|yep|ok|okay|sure|correct|sounds good|go ahead|please do|fine|alright|all right)\b[\s,]*(?:(?:and|also|use|choose|from)\b[\s,]*)?",
-        "", value, flags=re.I,
+        "",
+        value,
+        flags=re.I,
     )
-    value = re.sub(r"\b(?:eur|euro|euros|usd|dollar|dollars|gbp|pound|pounds)\b|[€$£]", " ", value, flags=re.I)
+    value = re.sub(
+        r"\b(?:eur|euro|euros|usd|dollar|dollars|gbp|pound|pounds)\b|[€$£]", " ", value, flags=re.I
+    )
     value = re.sub(r"\b(?:and|also|use|choose|from|the|my|account)\b", " ", value, flags=re.I)
     return " ".join(value.split()).strip(" ,.;:!?-")
 
 
 def resolve_currency_reply(
-    workflow: dict[str, Any], answer: str, context: dict[str, Any],
+    workflow: dict[str, Any],
+    answer: str,
+    context: dict[str, Any],
 ) -> tuple[str, dict[str, Any]]:
     """Resolve currency and an optional source-account choice from one reply."""
     updated = dict(workflow)
@@ -526,11 +639,19 @@ def resolve_currency_reply(
         updated["stage"] = "CANCELLED"
         return "CANCELLED", updated
 
-    proposed = str(updated.get("proposed_currency") or (updated.get("contact") or {}).get("currency") or "").upper()
+    proposed = str(
+        updated.get("proposed_currency") or (updated.get("contact") or {}).get("currency") or ""
+    ).upper()
     currency_tokens = {
-        "eur": "EUR", "euro": "EUR", "euros": "EUR",
-        "usd": "USD", "dollar": "USD", "dollars": "USD",
-        "gbp": "GBP", "pound": "GBP", "pounds": "GBP",
+        "eur": "EUR",
+        "euro": "EUR",
+        "euros": "EUR",
+        "usd": "USD",
+        "dollar": "USD",
+        "dollars": "USD",
+        "gbp": "GBP",
+        "pound": "GBP",
+        "pounds": "GBP",
     }
     explicit_currency = ""
     for token, code in currency_tokens.items():
@@ -538,25 +659,52 @@ def resolve_currency_reply(
             explicit_currency = code
             break
     if not explicit_currency and any(symbol in value for symbol in ("€", "$", "£")):
-        explicit_currency = {"€": "EUR", "$": "USD", "£": "GBP"}[next(symbol for symbol in ("€", "$", "£") if symbol in value)]
+        explicit_currency = {"€": "EUR", "$": "USD", "£": "GBP"}[
+            next(symbol for symbol in ("€", "$", "£") if symbol in value)
+        ]
 
-    acknowledgement = bool(re.match(
-        r"^(?:yes|yeah|yep|ok|okay|sure|correct|sounds good|go ahead|please do|fine|alright|all right)(?:\b|[, ])",
-        value, flags=re.I,
-    )) or value in {"yes", "yeah", "yep", "ok", "okay", "sure", "correct", "sounds good", "go ahead", "please do", "fine", "alright", "all right"}
+    acknowledgement = bool(
+        re.match(
+            r"^(?:yes|yeah|yep|ok|okay|sure|correct|sounds good|go ahead|please do|fine|alright|all right)(?:\b|[, ])",
+            value,
+            flags=re.I,
+        )
+    ) or value in {
+        "yes",
+        "yeah",
+        "yep",
+        "ok",
+        "okay",
+        "sure",
+        "correct",
+        "sounds good",
+        "go ahead",
+        "please do",
+        "fine",
+        "alright",
+        "all right",
+    }
     source_reply = _remaining_source_choice_text(answer)
     source_accounts = _eligible_accounts(context, proposed) or [
-        dict(item) for item in (updated.get("source_account_candidates") or [])
+        dict(item)
+        for item in (updated.get("source_account_candidates") or [])
         if isinstance(item, dict) and str(item.get("currency", "")).upper() == proposed
     ]
     source_preference_reply = bool(_source_account_preference(source_reply))
-    source_account_reply = bool(source_reply and _account_by_preference(
-        source_reply, source_accounts, allow_unique_fallback=False,
-    )[0])
+    source_account_reply = bool(
+        source_reply
+        and _account_by_preference(
+            source_reply,
+            source_accounts,
+            allow_unique_fallback=False,
+        )[0]
+    )
     # The clarification explicitly tells the customer that choosing a funding
     # account confirms the saved recipient currency. A source choice therefore
     # counts as confirmation without requiring a redundant separate "yes".
-    currency = explicit_currency or (proposed if acknowledgement or source_preference_reply or source_account_reply else "")
+    currency = explicit_currency or (
+        proposed if acknowledgement or source_preference_reply or source_account_reply else ""
+    )
     if currency not in {"EUR", "USD", "GBP"}:
         return "UNRELATED", updated
 
@@ -585,17 +733,22 @@ def resolve_currency_reply(
             accounts = _eligible_accounts(context, currency)
             if not accounts:
                 accounts = [
-                    dict(item) for item in (updated.get("source_account_candidates") or [])
+                    dict(item)
+                    for item in (updated.get("source_account_candidates") or [])
                     if isinstance(item, dict) and str(item.get("currency", "")).upper() == currency
                 ]
             account_id, reason = _account_by_preference(
-                source_reply, accounts, allow_unique_fallback=False,
+                source_reply,
+                accounts,
+                allow_unique_fallback=False,
             )
             if account_id:
                 updated["source_account_id"] = account_id
                 updated.pop("source_account_query", None)
             elif reason.startswith("NEEDS_VERIFIED_BALANCE_"):
-                updated["source_account_preference"] = "highest_balance" if reason.endswith("_MAX") else "lowest_balance"
+                updated["source_account_preference"] = (
+                    "highest_balance" if reason.endswith("_MAX") else "lowest_balance"
+                )
                 updated.pop("source_account_query", None)
                 updated.pop("source_account_id", None)
             elif reason not in {"ACCOUNT_REQUIRED", "NO_COMPATIBLE_ACCOUNT"}:
@@ -606,8 +759,11 @@ def resolve_currency_reply(
 
 
 def resolve_source_account_reply(
-    workflow: dict[str, Any], answer: str, context: dict[str, Any],
-    *, verified_accounts: list[dict[str, Any]] | None = None,
+    workflow: dict[str, Any],
+    answer: str,
+    context: dict[str, Any],
+    *,
+    verified_accounts: list[dict[str, Any]] | None = None,
 ) -> tuple[str, dict[str, Any]]:
     """Resolve a source-account reply against freshly verified eligible account records."""
     updated = dict(workflow)
@@ -626,8 +782,11 @@ def resolve_source_account_reply(
         # Reuse their identifiers/names only to interpret the bounded reply;
         # the selected ID is re-verified through MCP before a draft can open.
         stored_candidates = workflow.get("source_account_candidates") or []
-        accounts = [dict(item) for item in stored_candidates if isinstance(item, dict)
-                    and str(item.get("currency", "")).upper() == currency]
+        accounts = [
+            dict(item)
+            for item in stored_candidates
+            if isinstance(item, dict) and str(item.get("currency", "")).upper() == currency
+        ]
     # A pending clarification must be resolved by this answer, not silently
     # by a previously selected UI account. The selected account is considered
     # earlier when the workflow is first created; it is not an interpretation
@@ -639,7 +798,9 @@ def resolve_source_account_reply(
         return "VERIFY_SOURCE_ACCOUNT", updated
     updated["account_resolution_reason"] = reason
     if reason.startswith("NEEDS_VERIFIED_BALANCE_"):
-        updated["source_account_preference"] = "highest_balance" if reason.endswith("_MAX") else "lowest_balance"
+        updated["source_account_preference"] = (
+            "highest_balance" if reason.endswith("_MAX") else "lowest_balance"
+        )
         updated["stage"] = "RESOLVING_SOURCE_ACCOUNT"
         return "NEEDS_VERIFIED_BALANCE", updated
     if reason in {"ACCOUNT_REQUIRED", "NO_COMPATIBLE_ACCOUNT"}:
@@ -653,7 +814,9 @@ def resolve_source_account_reply(
 
 
 def apply_verified_account_ranking(
-    workflow: dict[str, Any], context: dict[str, Any], verified_accounts: list[dict[str, Any]],
+    workflow: dict[str, Any],
+    context: dict[str, Any],
+    verified_accounts: list[dict[str, Any]],
 ) -> tuple[str, dict[str, Any]]:
     """Rank only authenticated, currency-compatible account results.
 
@@ -674,13 +837,15 @@ def apply_verified_account_ranking(
     # be absent on a later conversational turn. Currency and active status are
     # checked against the trusted result itself.
     eligible = [
-        dict(item) for item in (verified_accounts or [])
+        dict(item)
+        for item in (verified_accounts or [])
         if isinstance(item, dict)
         and str(item.get("currency", "")).upper() == currency
         and str(item.get("status", "ACTIVE")).upper() == "ACTIVE"
     ]
     trusted = [
-        item for item in eligible
+        item
+        for item in eligible
         if isinstance(item.get("balance_minor"), int)
         and not isinstance(item.get("balance_minor"), bool)
     ]
@@ -702,30 +867,41 @@ def apply_verified_account_ranking(
         return "AWAITING_SOURCE_ACCOUNT", updated
 
     updated["source_account_id"] = str(winners[0]["account_id"])
-    updated["account_resolution_reason"] = "VERIFIED_HIGHEST_BALANCE" if preference == "highest_balance" else "VERIFIED_LOWEST_BALANCE"
+    updated["account_resolution_reason"] = (
+        "VERIFIED_HIGHEST_BALANCE" if preference == "highest_balance" else "VERIFIED_LOWEST_BALANCE"
+    )
     updated["stage"] = "READY_FOR_DRAFT"
     return "READY_FOR_DRAFT", updated
 
 
 def apply_verified_source_account_selection(
-    workflow: dict[str, Any], verified_accounts: list[dict[str, Any]],
+    workflow: dict[str, Any],
+    verified_accounts: list[dict[str, Any]],
 ) -> tuple[str, dict[str, Any]]:
     """Check the selected source against an authenticated MCP account read."""
     updated = dict(workflow)
     selected_id = str(updated.get("source_account_id") or "")
     currency = str(updated.get("currency") or "").upper()
-    selected = next((item for item in (verified_accounts or [])
-                     if isinstance(item, dict)
-                     and str(item.get("account_id", "")) == selected_id
-                     and str(item.get("currency", "")).upper() == currency
-                     and str(item.get("status", "ACTIVE")).upper() == "ACTIVE"), None)
+    selected = next(
+        (
+            item
+            for item in (verified_accounts or [])
+            if isinstance(item, dict)
+            and str(item.get("account_id", "")) == selected_id
+            and str(item.get("currency", "")).upper() == currency
+            and str(item.get("status", "ACTIVE")).upper() == "ACTIVE"
+        ),
+        None,
+    )
     if not selected:
         updated["source_account_id"] = ""
         updated["stage"] = "AWAITING_SOURCE_ACCOUNT"
         updated["account_resolution_reason"] = "SELECTED_ACCOUNT_NOT_VERIFIED"
         updated["source_account_candidates"] = [
-            dict(item) for item in (verified_accounts or [])
-            if isinstance(item, dict) and str(item.get("currency", "")).upper() == currency
+            dict(item)
+            for item in (verified_accounts or [])
+            if isinstance(item, dict)
+            and str(item.get("currency", "")).upper() == currency
             and str(item.get("status", "ACTIVE")).upper() == "ACTIVE"
         ]
         return "AWAITING_SOURCE_ACCOUNT", updated
@@ -750,10 +926,9 @@ def apply_frontend_draft_result(workflow: dict[str, Any], result: dict[str, Any]
     if status == "draft_opened":
         # The browser receipt must acknowledge the exact action requested by
         # this workflow. A stale or mismatched receipt cannot advance state.
-        if (
-            result.get("workflow_id") != workflow.get("workflow_id")
-            or result.get("action_id") != workflow.get("action_id")
-        ):
+        if result.get("workflow_id") != workflow.get("workflow_id") or result.get(
+            "action_id"
+        ) != workflow.get("action_id"):
             status = "rejected"
     updated["last_action_status"] = status
     if status == "draft_opened":
@@ -763,13 +938,17 @@ def apply_frontend_draft_result(workflow: dict[str, Any], result: dict[str, Any]
     return updated
 
 
-def apply_frontend_dismissal(workflow: dict[str, Any], draft_state: dict[str, Any] | None) -> dict[str, Any]:
+def apply_frontend_dismissal(
+    workflow: dict[str, Any], draft_state: dict[str, Any] | None
+) -> dict[str, Any]:
     """Record dismissal of the currently correlated frontend transfer draft."""
     updated = dict(workflow)
     if not isinstance(draft_state, dict):
         return updated
     same_workflow = draft_state.get("workflow_id") == updated.get("workflow_id")
-    same_action = not draft_state.get("action_id") or draft_state.get("action_id") == updated.get("action_id")
+    same_action = not draft_state.get("action_id") or draft_state.get("action_id") == updated.get(
+        "action_id"
+    )
     status = str(draft_state.get("status", "")).lower()
     if same_workflow and same_action and status in {"dismissed", "closed"}:
         updated["stage"] = "DISMISSED"
@@ -786,7 +965,11 @@ def account_choice_prompt(workflow: dict[str, Any]) -> str:
     source_query = str(workflow.get("source_account_query") or "").strip()
     contact_name = (workflow.get("contact") or {}).get("full_name", "the saved recipient")
     if not accounts:
-        prefix = (f"I couldn't find a compatible account matching **{source_query}**. " if source_query else "")
+        prefix = (
+            f"I couldn't find a compatible account matching **{source_query}**. "
+            if source_query
+            else ""
+        )
         return f"{prefix}I found **{contact_name}**, but no {workflow.get('currency', '')} source account is available. No transfer draft was opened."
     rows = "\n".join(
         f"{index}. **{item.get('account_name', 'Account')}** · {item.get('currency', workflow.get('currency', ''))}"
@@ -794,7 +977,8 @@ def account_choice_prompt(workflow: dict[str, Any]) -> str:
     )
     source_note = (
         f"I couldn't match your requested source **{source_query}** to one available {workflow.get('currency', '')} account. "
-        if source_query else ""
+        if source_query
+        else ""
     )
     return (
         f"{source_note}I found **{contact_name}**. "

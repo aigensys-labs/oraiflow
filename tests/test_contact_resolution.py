@@ -6,7 +6,6 @@ from shared.contact_resolution import (
     resolve_contact_choice,
 )
 
-
 ACCOUNTS = [
     {"account_id": "acc-001", "account_name": "Everyday account", "currency": "EUR"},
     {"account_id": "acc-002", "account_name": "Savings account", "currency": "EUR"},
@@ -15,12 +14,20 @@ ACCOUNTS = [
 
 CONTACTS = [
     {
-        "contact_id": "ct-john-carter", "full_name": "John Carter", "bank_name": "Northstar Bank",
-        "account_reference_masked": "DEMO ···· 1042", "currency": "EUR", "status": "ACTIVE",
+        "contact_id": "ct-john-carter",
+        "full_name": "John Carter",
+        "bank_name": "Northstar Bank",
+        "account_reference_masked": "DEMO ···· 1042",
+        "currency": "EUR",
+        "status": "ACTIVE",
     },
     {
-        "contact_id": "ct-john-mitchell", "full_name": "John Mitchell", "bank_name": "Union Financial",
-        "account_reference_masked": "DEMO ···· 2781", "currency": "EUR", "status": "ACTIVE",
+        "contact_id": "ct-john-mitchell",
+        "full_name": "John Mitchell",
+        "bank_name": "Union Financial",
+        "account_reference_masked": "DEMO ···· 2781",
+        "currency": "EUR",
+        "status": "ACTIVE",
     },
 ]
 
@@ -42,8 +49,14 @@ def test_transfer_parser_supports_currency_symbols_words_and_recipient_before_am
     context = {"accounts": ACCOUNTS, "selected_account_id": "acc-001"}
     assert extract_contact_transfer_request("Transfer €50 to Michael", context)["currency"] == "EUR"
     assert extract_contact_transfer_request("Send 50 euros to Michael", context)["amount"] == "50"
-    assert extract_contact_transfer_request("Pay Michael 50 EUR", context)["beneficiary_query"] == "Michael"
-    assert extract_contact_transfer_request("Send John Carter 50 EUR", context)["beneficiary_query"] == "John Carter"
+    assert (
+        extract_contact_transfer_request("Pay Michael 50 EUR", context)["beneficiary_query"]
+        == "Michael"
+    )
+    assert (
+        extract_contact_transfer_request("Send John Carter 50 EUR", context)["beneficiary_query"]
+        == "John Carter"
+    )
 
 
 def test_transfer_parser_fails_closed_when_currency_or_source_account_is_missing():
@@ -51,7 +64,12 @@ def test_transfer_parser_fails_closed_when_currency_or_source_account_is_missing
     no_accounts = extract_contact_transfer_request("Send 50 EUR to John", {"accounts": []})
     assert no_accounts is not None and no_accounts["from_account_id"] == ""
     assert no_accounts["source_account_candidates"] == []
-    assert extract_contact_transfer_request("Send 50 EUR to my savings account", {"accounts": ACCOUNTS}) is None
+    assert (
+        extract_contact_transfer_request(
+            "Send 50 EUR to my savings account", {"accounts": ACCOUNTS}
+        )
+        is None
+    )
 
 
 def test_duplicate_first_name_is_never_resolved_by_arbitrary_order():
@@ -110,7 +128,11 @@ def test_parser_uses_only_an_explicit_or_unique_currency_compatible_source_accou
     parsed = extract_contact_transfer_request("Send 50 EUR from Savings account to John", explicit)
     assert parsed["from_account_id"] == "acc-002"
     assert parsed["source_account_candidates"] == [
-        {"account_id": account["account_id"], "account_name": account["account_name"], "currency": "EUR"}
+        {
+            "account_id": account["account_id"],
+            "account_name": account["account_name"],
+            "currency": "EUR",
+        }
         for account in ACCOUNTS
     ]
 

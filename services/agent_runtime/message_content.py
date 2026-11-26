@@ -1,4 +1,5 @@
 """Null-safe conversion of LangChain message content to customer text."""
+
 from __future__ import annotations
 
 from typing import Any

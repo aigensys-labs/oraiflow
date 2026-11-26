@@ -5,6 +5,7 @@ record. It does not authorize, preview, approve, or submit a payment. Parsed val
 remain untrusted draft inputs until the customer reviews them and the Banking Kernel
 revalidates the contact, account, amount, currency and policy at preview/confirmation.
 """
+
 from __future__ import annotations
 
 import re
@@ -18,19 +19,47 @@ _AMOUNT_CURRENCY = re.compile(
     re.IGNORECASE,
 )
 _CURRENCY_CODES = {
-    "EUR": "EUR", "EURO": "EUR", "EUROS": "EUR", "€": "EUR",
-    "USD": "USD", "DOLLAR": "USD", "DOLLARS": "USD", "$": "USD",
-    "GBP": "GBP", "POUND": "GBP", "POUNDS": "GBP", "£": "GBP",
+    "EUR": "EUR",
+    "EURO": "EUR",
+    "EUROS": "EUR",
+    "€": "EUR",
+    "USD": "USD",
+    "DOLLAR": "USD",
+    "DOLLARS": "USD",
+    "$": "USD",
+    "GBP": "GBP",
+    "POUND": "GBP",
+    "POUNDS": "GBP",
+    "£": "GBP",
 }
 _CANCEL = re.compile(r"\b(cancel|never mind|nevermind|stop|don't transfer|do not transfer)\b", re.I)
 _ORDINALS = {
-    "first": 1, "first one": 1, "the first": 1, "the first one": 1,
-    "second": 2, "second one": 2, "the second": 2, "the second one": 2,
-    "third": 3, "third one": 3, "the third": 3, "the third one": 3,
-    "fourth": 4, "fourth one": 4, "the fourth": 4, "the fourth one": 4,
-    "last one": -1, "the last one": -1,
-    "latter": -1, "the latter": -1, "latter one": -1, "the latter one": -1,
-    "former": 1, "the former": 1, "former one": 1, "the former one": 1,
+    "first": 1,
+    "first one": 1,
+    "the first": 1,
+    "the first one": 1,
+    "second": 2,
+    "second one": 2,
+    "the second": 2,
+    "the second one": 2,
+    "third": 3,
+    "third one": 3,
+    "the third": 3,
+    "the third one": 3,
+    "fourth": 4,
+    "fourth one": 4,
+    "the fourth": 4,
+    "the fourth one": 4,
+    "last one": -1,
+    "the last one": -1,
+    "latter": -1,
+    "the latter": -1,
+    "latter one": -1,
+    "the latter one": -1,
+    "former": 1,
+    "the former": 1,
+    "former one": 1,
+    "the former one": 1,
 }
 
 
@@ -52,8 +81,22 @@ def _is_plausible_recipient_name(value: str) -> bool:
         return False
     # Common instruction/preposition fragments are not contact identifiers.
     if words[0] in {
-        "of", "for", "from", "using", "to", "with", "the", "a", "an",
-        "some", "any", "money", "funds", "payment", "transfer", "please",
+        "of",
+        "for",
+        "from",
+        "using",
+        "to",
+        "with",
+        "the",
+        "a",
+        "an",
+        "some",
+        "any",
+        "money",
+        "funds",
+        "payment",
+        "transfer",
+        "please",
     }:
         return False
     # A contact name must not contain the amount/currency that the parser
@@ -64,7 +107,10 @@ def _is_plausible_recipient_name(value: str) -> bool:
 
 
 def extract_contact_transfer_request(
-    message: str, context: dict[str, Any] | None = None, *, allow_currency_missing: bool = False,
+    message: str,
+    context: dict[str, Any] | None = None,
+    *,
+    allow_currency_missing: bool = False,
 ) -> dict[str, Any] | None:
     """Extract a narrow, explicit amount/currency/recipient transfer request.
 
@@ -96,7 +142,7 @@ def extract_contact_transfer_request(
     # Also accept "pay John 50 EUR" / "send John 50 EUR" without inventing
     # a beneficiary from unrelated trailing words.
     if not recipient:
-        before_amount = text[:amount_match.start()].strip(" ,;:")
+        before_amount = text[: amount_match.start()].strip(" ,;:")
         prefix_match = re.search(r"\b(?:send|transfer|pay)\s+(.+)$", before_amount, re.I)
         if prefix_match:
             recipient = _clean_recipient(prefix_match.group(1))
@@ -111,17 +157,28 @@ def extract_contact_transfer_request(
 
     context = context if isinstance(context, dict) else {}
     accounts = context.get("accounts") if isinstance(context.get("accounts"), list) else []
-    valid_accounts = [account for account in accounts if isinstance(account, dict) and account.get("account_id")]
+    valid_accounts = [
+        account for account in accounts if isinstance(account, dict) and account.get("account_id")
+    ]
     selected_id = context.get("selected_account_id")
-    selected = next((account for account in valid_accounts if account.get("account_id") == selected_id), None)
+    selected = next(
+        (account for account in valid_accounts if account.get("account_id") == selected_id), None
+    )
     explicit_account = next(
-        (account for account in valid_accounts
-         if account.get("account_name") and _normalise(account["account_name"]) in _normalise(text)),
+        (
+            account
+            for account in valid_accounts
+            if account.get("account_name")
+            and _normalise(account["account_name"]) in _normalise(text)
+        ),
         None,
     )
-    explicit_source_clause = re.search(r"\b(?:from|using|out of)\s+(.+?)\s*[.!?]*$", text, re.IGNORECASE)
+    explicit_source_clause = re.search(
+        r"\b(?:from|using|out of)\s+(.+?)\s*[.!?]*$", text, re.IGNORECASE
+    )
     currency_accounts = [
-        account for account in valid_accounts
+        account
+        for account in valid_accounts
         if currency and str(account.get("currency", "")).upper() == currency
     ]
 
@@ -130,7 +187,11 @@ def extract_contact_transfer_request(
     # valid source; otherwise an account may be inferred only when exactly one
     # currency-compatible account exists.
     if explicit_account:
-        source = explicit_account if str(explicit_account.get("currency", "")).upper() == currency else None
+        source = (
+            explicit_account
+            if str(explicit_account.get("currency", "")).upper() == currency
+            else None
+        )
     elif explicit_source_clause:
         # An explicit source clause owns the slot even when it cannot yet be
         # resolved. Never substitute the ambient UI selection or sole account.
@@ -145,7 +206,11 @@ def extract_contact_transfer_request(
         "currency": currency or "",
         "from_account_id": str(source["account_id"]) if source else "",
         "source_account_candidates": [
-            {"account_id": str(account["account_id"]), "account_name": str(account.get("account_name", "")), "currency": str(account.get("currency", "")).upper()}
+            {
+                "account_id": str(account["account_id"]),
+                "account_name": str(account.get("account_name", "")),
+                "currency": str(account.get("currency", "")).upper(),
+            }
             for account in currency_accounts
         ],
     }
@@ -171,23 +236,52 @@ def resolve_contact_choice(candidates: list[dict[str, Any]], answer: str) -> dic
             index = len(candidates)
         return candidates[index - 1] if 1 <= index <= len(candidates) else None
 
-    exact = [candidate for candidate in candidates if _normalise(candidate.get("full_name", "")) == value]
+    exact = [
+        candidate for candidate in candidates if _normalise(candidate.get("full_name", "")) == value
+    ]
     if len(exact) == 1:
         return exact[0]
 
     # A bank name or masked account suffix can disambiguate identical names.
-    narrowed = [candidate for candidate in candidates
-                if (_normalise(candidate.get("full_name", "")) and _normalise(candidate.get("full_name", "")) in value)
-                or (_normalise(candidate.get("bank_name", "")) and _normalise(candidate.get("bank_name", "")) in value)
-                or (_normalise(candidate.get("account_reference_masked", "")) and _normalise(candidate.get("account_reference_masked", "")) in value)]
+    narrowed = [
+        candidate
+        for candidate in candidates
+        if (
+            _normalise(candidate.get("full_name", ""))
+            and _normalise(candidate.get("full_name", "")) in value
+        )
+        or (
+            _normalise(candidate.get("bank_name", ""))
+            and _normalise(candidate.get("bank_name", "")) in value
+        )
+        or (
+            _normalise(candidate.get("account_reference_masked", ""))
+            and _normalise(candidate.get("account_reference_masked", "")) in value
+        )
+    ]
     if len(narrowed) == 1:
         return narrowed[0]
 
     # A unique name token is acceptable only within the already retrieved
     # candidate set. Remove common connective words so combined answers such as
     # "Carter from Everyday account" still resolve the bounded contact choice.
-    stop_words = {"the", "a", "an", "from", "with", "to", "for", "please",
-                  "use", "using", "account", "my", "source", "one", "contact"}
+    stop_words = {
+        "the",
+        "a",
+        "an",
+        "from",
+        "with",
+        "to",
+        "for",
+        "please",
+        "use",
+        "using",
+        "account",
+        "my",
+        "source",
+        "one",
+        "contact",
+    }
     answer_tokens = {token for token in re.findall(r"[a-z0-9]+", value) if token not in stop_words}
     token_matches = []
     for candidate in candidates:

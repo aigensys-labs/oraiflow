@@ -4,7 +4,9 @@ from shared.identity import IdentityContext, require_capability
 
 
 def test_capability_grant_is_explicit():
-    identity = IdentityContext("user-001", "tenant-demo", "local-demo-config", frozenset({"accounts:read"}))
+    identity = IdentityContext(
+        "user-001", "tenant-demo", "local-demo-config", frozenset({"accounts:read"})
+    )
     require_capability(identity, "accounts:read")
     with pytest.raises(PermissionError):
         require_capability(identity, "payments:confirm")

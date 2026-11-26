@@ -28,7 +28,10 @@ def _human(content):
 
 def test_affirmative_confirms_only_the_immediately_pending_workspace_action():
     pending = navigation_confirmation_metadata("Controls & audit")
-    messages = [_ai("I found Controls & audit. Would you like me to open it?", pending), _human("yes")]
+    messages = [
+        _ai("I found Controls & audit. Would you like me to open it?", pending),
+        _human("yes"),
+    ]
     decision = resolve_pending_navigation_confirmation(messages, "yes", {"navigate_workspace"})
     assert decision is not None
     assert decision["kind"] == "EXECUTE"
@@ -39,7 +42,10 @@ def test_affirmative_confirms_only_the_immediately_pending_workspace_action():
 def test_ok_and_okay_confirm_only_an_immediately_pending_workspace_action():
     for answer in ("ok", "okay", "OK."):
         pending = navigation_confirmation_metadata("Contacts")
-        messages = [_ai("I found Contacts. Would you like me to open that workspace?", pending), _human(answer)]
+        messages = [
+            _ai("I found Contacts. Would you like me to open that workspace?", pending),
+            _human(answer),
+        ]
         decision = resolve_pending_navigation_confirmation(messages, answer, {"navigate_workspace"})
         assert decision is not None
         assert decision["kind"] == "EXECUTE"
@@ -118,7 +124,11 @@ def test_direct_resource_view_verbs_are_explicit_without_a_confirmation_turn():
         "Show my recent transactions",
     ):
         assert is_explicit_workspace_view_request(utterance) is True, utterance
-    for utterance in ("what is my balance?", "where are my contacts?", "what is the Contacts workspace for?"):
+    for utterance in (
+        "what is my balance?",
+        "where are my contacts?",
+        "what is the Contacts workspace for?",
+    ):
         assert is_explicit_workspace_view_request(utterance) is False, utterance
 
 
@@ -134,8 +144,16 @@ def test_information_and_concept_questions_are_not_misrouted_to_workspace_pages(
 
 def _tool_call(workspace, action_id="nav-1234567890abcdef"):
     return SimpleNamespace(
-        type="ai", content="", additional_kwargs={},
-        tool_calls=[{"name": "navigate_workspace", "args": {"workspace": workspace, "action_id": action_id}, "id": action_id}],
+        type="ai",
+        content="",
+        additional_kwargs={},
+        tool_calls=[
+            {
+                "name": "navigate_workspace",
+                "args": {"workspace": workspace, "action_id": action_id},
+                "id": action_id,
+            }
+        ],
     )
 
 
@@ -152,10 +170,15 @@ def test_navigation_receipt_consumes_the_action_for_the_current_turn():
 
 def test_navigation_acknowledgement_consumes_the_action_for_the_current_turn():
     ack = SimpleNamespace(
-        type="ai", content="I've opened Contacts for you.", tool_calls=[],
-        additional_kwargs={"oraiflow_frontend_action_receipt": {
-            "capability_id": "frontend.workspace.navigate", "status": "opened"
-        }},
+        type="ai",
+        content="I've opened Contacts for you.",
+        tool_calls=[],
+        additional_kwargs={
+            "oraiflow_frontend_action_receipt": {
+                "capability_id": "frontend.workspace.navigate",
+                "status": "opened",
+            }
+        },
     )
     messages = [_human("show me my contacts"), _tool_call("Contacts"), ack]
     assert navigation_action_already_emitted(messages, "Contacts") is True
@@ -172,7 +195,11 @@ def test_manual_later_request_can_navigate_to_the_same_workspace_again():
 
 
 def test_navigation_action_from_an_earlier_turn_does_not_block_a_new_turn():
-    messages = [_human("show me my contacts"), _tool_call("Contacts"), _human("take me to contacts")]
+    messages = [
+        _human("show me my contacts"),
+        _tool_call("Contacts"),
+        _human("take me to contacts"),
+    ]
     assert navigation_action_already_emitted(messages, "Contacts") is False
 
 
@@ -201,7 +228,9 @@ def test_incomplete_navigation_request_is_preserved_as_a_typed_task():
     from shared.pending_task import latest_pending_task
 
     assistant = _ai("Which ORAIflow workspace would you like me to open?")
-    attach_navigation_task(assistant, "AWAITING_DESTINATION", {"destination_query": "take me there"})
+    attach_navigation_task(
+        assistant, "AWAITING_DESTINATION", {"destination_query": "take me there"}
+    )
     messages = [assistant, _human("Contacts")]
     pending = latest_pending_task(messages, domain="navigation")
     assert pending is not None

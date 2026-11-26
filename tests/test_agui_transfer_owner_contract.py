@@ -3,6 +3,7 @@
 These checks intentionally do not import the optional LangGraph/AG-UI runtime,
 so adapter ownership regressions remain testable in lightweight environments.
 """
+
 from __future__ import annotations
 
 import ast
@@ -59,8 +60,7 @@ def test_demo_agui_graph_uses_the_canonical_transfer_workflow_owner():
     assert 'tool_name not in {"search_contacts", "list_customer_accounts"}' in source
 
     function_names = {
-        node.name for node in tree.body
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        node.name for node in tree.body if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
     }
     assert "build_demo_agui_graph" in function_names
 
@@ -86,7 +86,7 @@ def test_call_model_resumes_pending_transfer_before_navigation_and_semantic_inte
     source = AGENT_PATH.read_text(encoding="utf-8")
     start = source.index("    async def call_model(state: ORAIState)")
     end = source.find("\n    async def ", start + 10)
-    body = source[start:end if end >= 0 else None]
+    body = source[start : end if end >= 0 else None]
 
     explicit_start = body.index("transfer_start = _start_explicit_transfer_workflow")
     transfer_resume = body.index("transfer_step = _handle_transfer_workflow")
@@ -102,14 +102,16 @@ def test_runtime_owned_transfer_calls_keep_progress_as_protocol_not_customer_pro
         "_prepare_transfer_draft_action",
     }
     functions = {
-        node.name: node for node in tree.body
+        node.name: node
+        for node in tree.body
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name in target_names
     }
     assert set(functions) == target_names
 
     for name, function in functions.items():
         calls = [
-            node for node in ast.walk(function)
+            node
+            for node in ast.walk(function)
             if isinstance(node, ast.Call)
             and isinstance(node.func, ast.Name)
             and node.func.id == "AIMessage"
@@ -119,19 +121,30 @@ def test_runtime_owned_transfer_calls_keep_progress_as_protocol_not_customer_pro
             content = next((kw.value for kw in call.keywords if kw.arg == "content"), None)
             if isinstance(content, ast.Name):
                 assignments = [
-                    node for node in ast.walk(function)
+                    node
+                    for node in ast.walk(function)
                     if isinstance(node, ast.Assign)
-                    and any(isinstance(target, ast.Name) and target.id == content.id for target in node.targets)
+                    and any(
+                        isinstance(target, ast.Name) and target.id == content.id
+                        for target in node.targets
+                    )
                 ]
                 text_values = [
-                    node.value for assignment in assignments for node in ast.walk(assignment.value)
+                    node.value
+                    for assignment in assignments
+                    for node in ast.walk(assignment.value)
                     if isinstance(node, ast.Constant) and isinstance(node.value, str)
                 ]
             else:
-                text_values = [
-                    node.value for node in ast.walk(content)
-                    if isinstance(node, ast.Constant) and isinstance(node.value, str)
-                ] if content is not None else []
+                text_values = (
+                    [
+                        node.value
+                        for node in ast.walk(content)
+                        if isinstance(node, ast.Constant) and isinstance(node.value, str)
+                    ]
+                    if content is not None
+                    else []
+                )
             # Progress is already shown by the frontend's tool activity UI.
             # Keep these protocol tool-call messages text-empty so the customer
             # receives only the workflow's targeted clarification and terminal ack.
@@ -142,7 +155,7 @@ def test_transaction_analysis_is_preserved_as_a_pending_semantic_task():
     source = AGENT_PATH.read_text(encoding="utf-8")
     start = source.index("def _pending_semantic_tasks(")
     end = source.find("\ndef ", start + 5)
-    body = source[start:end if end >= 0 else None]
+    body = source[start : end if end >= 0 else None]
     assert '"TRANSACTION_ANALYSIS"' in body
     assert '"semantic_slots"' in body
     assert '"semantic_evidence"' in body
@@ -151,20 +164,20 @@ def test_transaction_analysis_is_preserved_as_a_pending_semantic_task():
 def test_graph_route_stops_after_a_successful_frontend_action_acknowledgement():
     tree = _module(AGENT_PATH)
     route = next(
-        node for node in ast.walk(tree)
+        node
+        for node in ast.walk(tree)
         if isinstance(node, ast.FunctionDef) and node.name == "route"
     )
     calls = [
-        node for node in ast.walk(route)
+        node
+        for node in ast.walk(route)
         if isinstance(node, ast.Call)
         and isinstance(node.func, ast.Name)
         and node.func.id == "has_successful_frontend_ack_after_latest_user"
     ]
     assert calls, "Graph re-entry must check the current turn's verified action receipt"
     assert any(
-        isinstance(node, ast.Return)
-        and isinstance(node.value, ast.Name)
-        and node.value.id == "END"
+        isinstance(node, ast.Return) and isinstance(node.value, ast.Name) and node.value.id == "END"
         for node in ast.walk(route)
     )
 
@@ -174,7 +187,9 @@ def test_demo_agui_graph_resumes_pending_navigation_before_generic_help_or_chat_
     assert "_pending_navigation_message," in source
     continuation = source.index("navigation_continuation = _pending_navigation_message(state)")
     help_fallback = source.index("workspace_help = workspace_help_for_request", continuation)
-    navigation_dispatch = source.index("navigation_step = _workspace_navigation_step", help_fallback)
+    navigation_dispatch = source.index(
+        "navigation_step = _workspace_navigation_step", help_fallback
+    )
     assert continuation < help_fallback < navigation_dispatch
 
 
@@ -203,7 +218,10 @@ def test_demo_agui_wraps_successful_browser_receipts_in_a_durable_action_ack():
     assert "_frontend_action_ack_message," in source
     assert '"capability_id": registered[0]' in source
     assert '"tool_call_id": str(message_value(last_message, "tool_call_id", ""))' in source
-    assert 'if outcome == "SUCCESS" and status in {"draft_opened", "opened", "selected", "cleared"}' in source
+    assert (
+        'if outcome == "SUCCESS" and status in {"draft_opened", "opened", "selected", "cleared"}'
+        in source
+    )
     assert 'return {"messages": [_frontend_action_ack_message(reply, receipt)]}' in source
 
 
@@ -215,13 +233,18 @@ def test_demo_agui_reads_serialized_messages_via_shared_message_accessors():
     assert 'message_value(latest, "content", "")' in source
 
 
-
 def test_demo_agui_reaches_browser_receipt_acknowledgement_before_final_replay_guard():
     source = AGUI_PATH.read_text(encoding="utf-8")
     respond_start = source.index("async def _respond(state: ORAIState):")
-    guard = source.index("if has_successful_frontend_ack_after_latest_user(messages):", respond_start)
-    tool_result = source.index('if last_message is not None and message_type(last_message) == "tool":', respond_start)
-    ack_return = source.index('return {"messages": [_frontend_action_ack_message(reply, receipt)]}', tool_result)
+    guard = source.index(
+        "if has_successful_frontend_ack_after_latest_user(messages):", respond_start
+    )
+    tool_result = source.index(
+        'if last_message is not None and message_type(last_message) == "tool":', respond_start
+    )
+    ack_return = source.index(
+        'return {"messages": [_frontend_action_ack_message(reply, receipt)]}', tool_result
+    )
     assert guard < tool_result < ack_return
     # The replay helper's unit contract deliberately excludes raw ToolMessages;
     # this block therefore runs on a new browser receipt and emits the final ack.

@@ -6,7 +6,6 @@ import ast
 import sys
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 PRODUCTION_ROOTS = (ROOT / "services", ROOT / "shared", ROOT / "scripts")
 
@@ -41,9 +40,7 @@ def find_missing_docstrings() -> list[str]:
                 missing.append(f"{relative}: module docstring")
             for definition in _public_definitions(module):
                 if not ast.get_docstring(definition):
-                    missing.append(
-                        f"{relative}:{definition.lineno}: {definition.name} docstring"
-                    )
+                    missing.append(f"{relative}:{definition.lineno}: {definition.name} docstring")
     return missing
 
 
