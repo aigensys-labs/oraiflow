@@ -1,0 +1,156 @@
+{
+  "schema_version": "1.0.0",
+  "policy_id": "oraiflow.default",
+  "revision": 1,
+  "description": "Human-configurable routing policy for the ORAIflow Agent. OCCF remains authoritative for intent, capability, schema, presentation and authority contracts.",
+  "pre_assessment_routes": [
+    {
+      "id": "academy_personal_data",
+      "priority": 100,
+      "enabled": true,
+      "handler": "academy_personal_read",
+      "purpose": "Retrieve authenticated personal data only when an Academy topic explicitly requires it."
+    },
+    {
+      "id": "explicit_workspace_navigation",
+      "priority": 95,
+      "enabled": true,
+      "handler": "workspace_navigation",
+      "purpose": "Resolve an explicit workspace-open request through the registered navigation catalogue."
+    },
+    {
+      "id": "workspace_knowledge",
+      "priority": 90,
+      "enabled": true,
+      "handler": "workspace_knowledge",
+      "purpose": "Answer workspace-purpose and application-guide questions from registered workspace metadata."
+    },
+    {
+      "id": "academy_general_education",
+      "priority": 85,
+      "enabled": true,
+      "handler": "academy_education",
+      "purpose": "Answer general education requests from the maintained Academy catalogue when a direct resource is sufficient."
+    },
+    {
+      "id": "connector_result_status",
+      "priority": 80,
+      "enabled": true,
+      "handler": "connector_failure",
+      "purpose": "Preserve an actual connector failure as the outcome for the current turn."
+    },
+    {
+      "id": "canonical_read_fast_path",
+      "priority": 75,
+      "enabled": true,
+      "handler": "canonical_read",
+      "purpose": "Execute an unambiguous registered read through its OCCF plan without an interpretation call."
+    },
+    {
+      "id": "assistant_capability_guide",
+      "priority": 70,
+      "enabled": true,
+      "handler": "assistant_capabilities",
+      "purpose": "Explain the registered assistant capability catalogue."
+    },
+    {
+      "id": "simple_social",
+      "priority": 10,
+      "enabled": true,
+      "handler": "simple_social",
+      "purpose": "Handle a genuinely simple social turn after supported application resources have been considered."
+    }
+  ],
+  "task_dispatch": [
+    {
+      "task_class": "resource",
+      "handler": "registered_resource",
+      "purpose": "Use registered Academy, workspace or assistant-catalogue knowledge. A personal-data declaration may schedule its linked read capability first.",
+      "applicable_confidence_dimensions": [
+        "intent",
+        "entity"
+      ],
+      "low_confidence_behavior": "clarify_resource_or_topic"
+    },
+    {
+      "task_class": "mcp_read",
+      "handler": "occf_read",
+      "purpose": "Map the validated intent to its registered, authenticated, read-only MCP capability.",
+      "applicable_confidence_dimensions": [
+        "intent",
+        "slot",
+        "entity"
+      ],
+      "low_confidence_behavior": "clarify_missing_read_scope"
+    },
+    {
+      "task_class": "presentation",
+      "handler": "registered_presentation",
+      "purpose": "Execute declared presentation preflight reads and render only validated capability results.",
+      "applicable_confidence_dimensions": [
+        "intent",
+        "slot",
+        "entity"
+      ],
+      "low_confidence_behavior": "clarify_missing_presentation_inputs"
+    },
+    {
+      "task_class": "workflow",
+      "handler": "registered_workflow",
+      "purpose": "Continue the registered deterministic workflow from typed state; do not ask the model to choose each next tool.",
+      "applicable_confidence_dimensions": [
+        "intent",
+        "slot",
+        "entity"
+      ],
+      "low_confidence_behavior": "preserve_workflow_and_clarify"
+    },
+    {
+      "task_class": "frontend_action",
+      "handler": "registered_frontend_action",
+      "purpose": "Execute only registered frontend actions that pass the existing session and OCCF checks, then validate the action receipt.",
+      "applicable_confidence_dimensions": [
+        "intent",
+        "slot",
+        "entity"
+      ],
+      "low_confidence_behavior": "clarify_action_target"
+    },
+    {
+      "task_class": "clarification",
+      "handler": "preserve_and_clarify",
+      "purpose": "Preserve task identity and verified slots; ask only for the missing or ambiguous information.",
+      "applicable_confidence_dimensions": [
+        "intent"
+      ],
+      "low_confidence_behavior": "preserve_task_and_clarify"
+    },
+    {
+      "task_class": "unsupported",
+      "handler": "explain_supported_scope",
+      "purpose": "Explain the closest supported resources or capability boundary without inventing an operation.",
+      "applicable_confidence_dimensions": [
+        "intent"
+      ],
+      "low_confidence_behavior": "offer_supported_scope"
+    }
+  ],
+  "interpreter": {
+    "assessment_calls_per_new_turn": 1,
+    "format_recovery_calls": 1,
+    "may_select_capabilities": false,
+    "may_select_tools": false,
+    "may_authorize_actions": false,
+    "must_receive_decision_map": true,
+    "must_preserve_all_supported_tasks": true,
+    "must_not_treat_empty_candidate_shortlist_as_out_of_scope": true
+  },
+  "confidence": {
+    "configuration_source": "ORAI_CONFIDENCE_GATE_MODE",
+    "default_mode": "observe",
+    "observe_behavior": "validate_schema_evidence_registry_and_required_fields_without_blocking_on_uncalibrated_scores",
+    "enforce_behavior": "apply_only_explicit_calibrated_dimension_thresholds",
+    "low_confidence_behavior": "clarify_targeted_missing_information",
+    "confidence_grants_authority": false
+  }
+}

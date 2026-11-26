@@ -1,0 +1,257 @@
+name: oraiflow-core
+
+x-runtime-env: &runtime-env
+  CUSTOM_CA_FILE: ${CUSTOM_CA_FILE:-./certs/internal-ca.crt}
+  CUSTOM_CA_CONTAINER_FILE: ${CUSTOM_CA_CONTAINER_FILE:-/run/oraiflow/custom-ca.crt}
+  CA_BUNDLE_PATH: ${CA_BUNDLE_PATH:-/run/oraiflow/ca-bundle.pem}
+  SSL_CERT_FILE: ${CA_BUNDLE_PATH:-/run/oraiflow/ca-bundle.pem}
+  REQUESTS_CA_BUNDLE: ${CA_BUNDLE_PATH:-/run/oraiflow/ca-bundle.pem}
+  LOG_LEVEL: ${LOG_LEVEL:-INFO}
+
+x-database-env: &database-env
+  <<: *runtime-env
+  DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://oraiflow:local-only-change-me@postgres:5432/oraiflow}
+  DEMO_USER_ID: ${DEMO_USER_ID:-user-001}
+  DEMO_TENANT_ID: ${DEMO_TENANT_ID:-tenant-demo}
+  DEMO_DISPLAY_NAME: ${DEMO_DISPLAY_NAME:-Alex Morgan}
+  DEMO_TRANSACTION_HISTORY_ENABLED: ${DEMO_TRANSACTION_HISTORY_ENABLED:-true}
+  DEMO_SALARY_EMPLOYER: ${DEMO_SALARY_EMPLOYER:-Northstar Labs}
+  DEMO_LOAN_ENABLED: ${DEMO_LOAN_ENABLED:-false}
+  DEMO_LOAN_PRINCIPAL_MINOR: ${DEMO_LOAN_PRINCIPAL_MINOR:-500000}
+  DEMO_LOAN_APR_BPS: ${DEMO_LOAN_APR_BPS:-690}
+  DEMO_LOAN_TERM_MONTHS: ${DEMO_LOAN_TERM_MONTHS:-24}
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-oraiflow}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local-only-change-me}
+      POSTGRES_DB: ${POSTGRES_DB:-oraiflow}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./db/init/001-schema.sql:/docker-entrypoint-initdb.d/001-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-oraiflow} -d ${POSTGRES_DB:-oraiflow}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  temporal:
+    image: temporalio/temporal:1.10.1
+    # Disposable SQLite history is intentional for the local demo. It avoids
+    # host-volume ownership mismatches seen with the dev-server image.
+    command: server start-dev --ip 0.0.0.0 --db-filename /tmp/temporal.db
+    ports:
+      - "127.0.0.1:7233:7233"
+      - "127.0.0.1:8233:8233"
+    healthcheck:
+      test: ["CMD", "temporal", "operator", "cluster", "health"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    command: ["python", "-m", "shared.migrate"]
+    environment:
+      <<: *database-env
+      MCP_DATABASE_PASSWORD: ${MCP_DATABASE_PASSWORD:-local-only-read-change-me}
+      AGENT_CHECKPOINT_PASSWORD: ${AGENT_CHECKPOINT_PASSWORD:-local-agent-checkpoint-change-me}
+    volumes:
+      - ./certs:/certs:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    command: ["python", "-m", "services.mcp.main"]
+    environment:
+      <<: *runtime-env
+      MCP_DATABASE_URL: ${MCP_DATABASE_URL:-postgresql+psycopg://oraiflow_mcp_reader:${MCP_DATABASE_PASSWORD:-local-only-read-change-me}@postgres:5432/oraiflow}
+      DEMO_USER_ID: ${DEMO_USER_ID:-user-001}
+      DEMO_TENANT_ID: ${DEMO_TENANT_ID:-tenant-demo}
+      DEMO_LOAN_ENABLED: ${DEMO_LOAN_ENABLED:-false}
+      MCP_ACCESS_TOKEN: ${MCP_ACCESS_TOKEN:-local-mcp-token-change-me}
+      ORAI_BUSINESS_TIMEZONE: ${ORAI_BUSINESS_TIMEZONE:-Europe/Prague}
+    expose:
+      - "8100"
+    volumes:
+      - ./certs:/certs:ro
+    dns:
+      - ${API_DNS_SERVER_1:-1.1.1.1}
+      - ${API_DNS_SERVER_2:-8.8.8.8}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8100/healthz', timeout=2)"]
+      interval: 10s
+      timeout: 3s
+      retries: 15
+    restart: unless-stopped
+
+  agent-runtime:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    command: ["uvicorn", "services.agent_runtime.main:app", "--host", "0.0.0.0", "--port", "8101"]
+    environment:
+      <<: *runtime-env
+      MCP_URL: ${MCP_URL:-http://mcp:8100/mcp}
+      MCP_ACCESS_TOKEN: ${MCP_ACCESS_TOKEN:-local-mcp-token-change-me}
+      AGENT_RUNTIME_INTERNAL_TOKEN: ${AGENT_RUNTIME_INTERNAL_TOKEN:-local-agent-runtime-token-change-me}
+      AGENT_CHECKPOINT_DATABASE_URL: ${AGENT_CHECKPOINT_DATABASE_URL:-postgresql://oraiflow_agent_checkpoint:${AGENT_CHECKPOINT_PASSWORD:-local-agent-checkpoint-change-me}@postgres:5432/${POSTGRES_DB:-oraiflow}?options=-csearch_path%3Doraiflow_agent}
+      LANGGRAPH_STRICT_MSGPACK: ${LANGGRAPH_STRICT_MSGPACK:-true}
+      DEMO_USER_ID: ${DEMO_USER_ID:-user-001}
+      DEMO_DISPLAY_NAME: ${DEMO_DISPLAY_NAME:-Alex Morgan}
+      LLM_PROVIDER: ${LLM_PROVIDER:-demo}
+      LLM_EXTERNAL_DATA_APPROVED: ${LLM_EXTERNAL_DATA_APPROVED:-false}
+      LLM_MODEL: ${LLM_MODEL:-gpt-oss:20b}
+      LLM_TEMPERATURE: ${LLM_TEMPERATURE:-0}
+      LLM_TIMEOUT_SECONDS: ${LLM_TIMEOUT_SECONDS:-90}
+      LLM_MAX_RETRIES: ${LLM_MAX_RETRIES:-1}
+      LLM_TURN_MODEL_BUDGET_SECONDS: ${LLM_TURN_MODEL_BUDGET_SECONDS:-70}
+      LLM_INTERPRETATION_TIMEOUT_SECONDS: ${LLM_INTERPRETATION_TIMEOUT_SECONDS:-50}
+      LLM_RESPONSE_TIMEOUT_SECONDS: ${LLM_RESPONSE_TIMEOUT_SECONDS:-15}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      OLLAMA_NUM_CTX: ${OLLAMA_NUM_CTX:-8192}
+      OLLAMA_KEEP_ALIVE: ${OLLAMA_KEEP_ALIVE:-5m}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    expose:
+      - "8101"
+    # Local-only FastAPI docs for the LangGraph/AG-UI runtime. Do not bind this
+    # internal service to a public interface.
+    ports:
+      - "127.0.0.1:8101:8101"
+    volumes:
+      - ./certs:/certs:ro
+    dns:
+      - ${API_DNS_SERVER_1:-1.1.1.1}
+      - ${API_DNS_SERVER_2:-8.8.8.8}
+    depends_on:
+      mcp:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8101/healthz', timeout=2)"]
+      interval: 10s
+      timeout: 3s
+      retries: 15
+    restart: unless-stopped
+
+  copilot-runtime:
+    build:
+      context: ./services/copilot_runtime
+      dockerfile: Dockerfile
+    environment:
+      PORT: 3001
+      AGENT_AGUI_URL: ${AGENT_AGUI_URL:-http://agent-runtime:8101/agui}
+      AGENT_RUNTIME_INTERNAL_TOKEN: ${AGENT_RUNTIME_INTERNAL_TOKEN:-local-agent-runtime-token-change-me}
+      DEMO_USER_ID: ${DEMO_USER_ID:-user-001}
+      DEMO_DISPLAY_NAME: ${DEMO_DISPLAY_NAME:-Alex Morgan}
+    expose:
+      - "3001"
+    depends_on:
+      agent-runtime:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3001/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    command: ["uvicorn", "services.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    environment:
+      <<: *database-env
+      WEB_ORIGIN: ${WEB_ORIGIN:-http://localhost:3000}
+      DEMO_WORKSPACE_NAME: ${DEMO_WORKSPACE_NAME:-Atlas Fintech}
+      DEMO_POLICY_VERSION: ${DEMO_POLICY_VERSION:-demo-transfer-policy-v1}
+      PREVIEW_TTL_MINUTES: ${PREVIEW_TTL_MINUTES:-5}
+      PREVIEW_SIGNING_SECRET: ${PREVIEW_SIGNING_SECRET:-local-preview-signing-secret-change-me}
+      MCP_DATABASE_PASSWORD: ${MCP_DATABASE_PASSWORD:-local-only-read-change-me}
+      DEMO_SCA_APPROVED: ${DEMO_SCA_APPROVED:-true}
+      DEMO_SCA_CODE: ${DEMO_SCA_CODE:-123456}
+      DEMO_MAX_TRANSFER: ${DEMO_MAX_TRANSFER:-1000.00}
+      AGENT_RUNTIME_URL: ${AGENT_RUNTIME_URL:-http://agent-runtime:8101}
+      AGENT_RUNTIME_INTERNAL_TOKEN: ${AGENT_RUNTIME_INTERNAL_TOKEN:-local-agent-runtime-token-change-me}
+      AGENT_RUNTIME_TIMEOUT_SECONDS: ${AGENT_RUNTIME_TIMEOUT_SECONDS:-120}
+    ports:
+      - "${API_BIND_ADDRESS:-127.0.0.1}:${API_PORT:-8000}:8000"
+    volumes:
+      - ./certs:/certs:ro
+    dns:
+      - ${API_DNS_SERVER_1:-1.1.1.1}
+      - ${API_DNS_SERVER_2:-8.8.8.8}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+      agent-runtime:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz', timeout=2)"]
+      interval: 10s
+      timeout: 3s
+      retries: 15
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    command: ["python", "-m", "services.worker.main"]
+    environment:
+      <<: *database-env
+      TEMPORAL_ADDRESS: ${TEMPORAL_ADDRESS:-temporal:7233}
+      TEMPORAL_TASK_QUEUE: ${TEMPORAL_TASK_QUEUE:-oraiflow-transfers}
+      BANK_LEDGER_ADAPTER: ${BANK_LEDGER_ADAPTER:-postgres}
+      MCP_DATABASE_PASSWORD: ${MCP_DATABASE_PASSWORD:-local-only-read-change-me}
+    volumes:
+      - ./certs:/certs:ro
+    dns:
+      - ${API_DNS_SERVER_1:-1.1.1.1}
+      - ${API_DNS_SERVER_2:-8.8.8.8}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      temporal:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+    ports:
+      - "127.0.0.1:3000:80"
+    depends_on:
+      api:
+        condition: service_healthy
+      copilot-runtime:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres-data:

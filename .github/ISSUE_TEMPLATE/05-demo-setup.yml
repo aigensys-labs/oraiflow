@@ -1,0 +1,51 @@
+name: "🐳 Demo setup / Docker help"
+description: "Get help starting or operating the self-hosted synthetic demo."
+title: "🐳 [Demo setup]: "
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ORAIflow is intended to run locally through Docker Compose. Please include the command and sanitized error.
+        Do not paste `.env`, provider credentials, tokens, private keys or real financial information.
+  - type: input
+    id: operating-system
+    attributes:
+      label: Operating system
+      placeholder: Windows 11 / macOS / Ubuntu
+    validations:
+      required: true
+  - type: input
+    id: docker
+    attributes:
+      label: Docker Engine or Desktop version
+    validations:
+      required: true
+  - type: input
+    id: compose
+    attributes:
+      label: Docker Compose version
+      placeholder: docker compose version
+    validations:
+      required: true
+  - type: textarea
+    id: command
+    attributes:
+      label: Command and relevant output
+      description: Include the command and the smallest useful, sanitized output excerpt.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: attempted
+    attributes:
+      label: What have you tried?
+    validations:
+      required: false
+  - type: checkboxes
+    id: demo-data
+    attributes:
+      label: Data and privacy confirmation
+      options:
+        - label: I have not included secrets, personal information or real financial data.
+          required: true

@@ -1,0 +1,71 @@
+name: "🐛 Bug report"
+description: "Report a reproducible problem in the ORAIflow demo."
+title: "🐛 [Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve ORAIflow. Please keep reports focused and reproducible.
+        **Never include real financial data, personal information, credentials, API keys or unredacted logs.**
+  - type: input
+    id: summary
+    attributes:
+      label: What happened?
+      description: A concise description of the problem.
+      placeholder: The workspace shows an empty activity list after startup.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: ORAIflow version
+      placeholder: v0.7.7
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, Docker Engine/Desktop version and Docker Compose version.
+      placeholder: Windows 11, Docker Desktop 4.x, Compose v2.x
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Numbered steps using only the supplied synthetic demo data.
+      placeholder: |
+        1. Start the stack with docker compose up -d --build.
+        2. Open the workspace.
+        3. Select ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs (redacted)
+      description: Remove tokens, secrets, names and any non-synthetic data before posting.
+      render: text
+    validations:
+      required: false
+  - type: checkboxes
+    id: demo-data
+    attributes:
+      label: Data and privacy confirmation
+      options:
+        - label: I used only ORAIflow's synthetic demo data and removed secrets or personal information from this report.
+          required: true

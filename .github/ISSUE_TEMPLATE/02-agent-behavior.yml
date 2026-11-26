@@ -1,0 +1,62 @@
+name: "🧭 Agent behavior / conversation regression"
+description: "Report incorrect intent understanding, tool selection, workflow continuation or response grounding."
+title: "🧭 [Agent behavior]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form for conversational behavior, including incorrect interpretation, duplicate actions,
+        unexpected follow-up questions, late responses or answers that do not match retrieved demo data.
+        **Use synthetic examples only. Never post real customer data or secrets.**
+  - type: textarea
+    id: conversation
+    attributes:
+      label: Minimal conversation
+      description: Include the exact synthetic user messages and the assistant's relevant response.
+      placeholder: |
+        User: ...
+        Assistant: ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected agent behavior
+    validations:
+      required: true
+  - type: textarea
+    id: observed
+    attributes:
+      label: Observed behavior
+      validations:
+        required: true
+  - type: input
+    id: provider
+    attributes:
+      label: Model provider and model
+      description: For example, demo, Ollama, OpenAI or Anthropic. Never include API keys.
+      placeholder: demo / configured model name
+    validations:
+      required: true
+  - type: input
+    id: trace
+    attributes:
+      label: Trace ID (optional)
+      description: A trace identifier is useful; do not attach full unredacted transcripts.
+    validations:
+      required: false
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Available execution evidence
+      description: Planner fields, capability names, outcomes or timing, with sensitive values removed.
+    validations:
+      required: false
+  - type: checkboxes
+    id: demo-data
+    attributes:
+      label: Data and privacy confirmation
+      options:
+        - label: This report uses only synthetic demo data and contains no credentials, personal information or real financial records.
+          required: true

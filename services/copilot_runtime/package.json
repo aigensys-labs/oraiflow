@@ -1,0 +1,16 @@
+{
+  "name": "oraiflow-copilot-runtime",
+  "private": true,
+  "version": "0.7.7",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@ag-ui/client": "1.0.2",
+    "@copilotkit/runtime": "1.70.0"
+  },
+  "overrides": {
+    "openai": "7.60.0"
+  }
+}

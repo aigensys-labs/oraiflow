@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="600" viewBox="0 0 1600 600" fill="none">
+  <title>Orbital Intelligence</title>
+  <desc>Elegant orbital intelligence motif with layered rings, luminous nodes and a secure financial core.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1600" y2="600" gradientUnits="userSpaceOnUse"><stop stop-color="#0A1733"/><stop offset=".55" stop-color="#171C46"/><stop offset="1" stop-color="#0A2842"/></linearGradient>
+    <radialGradient id="core"><stop stop-color="#8B8AFF" stop-opacity=".5"/><stop offset=".55" stop-color="#5A83F2" stop-opacity=".16"/><stop offset="1" stop-color="#5A83F2" stop-opacity="0"/></radialGradient>
+    <linearGradient id="orbit" x1="690" y1="100" x2="1450" y2="510" gradientUnits="userSpaceOnUse"><stop stop-color="#8E8BFF" stop-opacity=".1"/><stop offset=".5" stop-color="#70DCEB" stop-opacity=".7"/><stop offset="1" stop-color="#A8A4FF" stop-opacity=".12"/></linearGradient>
+    <linearGradient id="glass" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#262E65" stop-opacity=".78"/><stop offset="1" stop-color="#122C49" stop-opacity=".78"/></linearGradient>
+    <filter id="soft" x="650" y="-80" width="920" height="760"><feGaussianBlur stdDeviation="48"/></filter>
+    <pattern id="dots" width="34" height="34" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1.2" fill="#A8B9FF" fill-opacity=".16"/></pattern>
+  </defs>
+  <path fill="url(#bg)" d="M0 0h1600v600H0z"/><path fill="url(#dots)" d="M0 0h1600v600H0z"/><ellipse cx="1120" cy="300" rx="340" ry="270" fill="url(#core)" filter="url(#soft)"/>
+  <g transform="translate(1120 300)" fill="none" stroke="url(#orbit)">
+    <ellipse rx="330" ry="125" stroke-width="2" transform="rotate(-19)"/><ellipse rx="280" ry="180" stroke-width="1.5" transform="rotate(28)"/><ellipse rx="210" ry="260" stroke-width="1.5" transform="rotate(64)"/><ellipse rx="370" ry="220" stroke-opacity=".35" stroke-dasharray="3 12" transform="rotate(-48)"/>
+    <circle r="125" stroke="#9C9CFF" stroke-opacity=".36" stroke-width="2"/><circle r="88" stroke="#75DDEB" stroke-opacity=".35" stroke-width="1.5"/>
+  </g>
+  <g stroke="#92A4FF" stroke-opacity=".52" stroke-width="2"><path d="m850 173 270 127 268-82M890 440l230-140 230 160M1030 95l90 205 100 170"/></g>
+  <g fill="#182D57" stroke="#93E3ED" stroke-width="2"><circle cx="850" cy="173" r="8"/><circle cx="1390" cy="218" r="9"/><circle cx="890" cy="440" r="8"/><circle cx="1350" cy="460" r="9"/><circle cx="1030" cy="95" r="7"/><circle cx="1220" cy="470" r="7"/></g>
+  <g fill="#B5B1FF"><circle cx="850" cy="173" r="3"/><circle cx="1390" cy="218" r="3.5"/><circle cx="1350" cy="460" r="3.5"/></g>
+  <g transform="translate(1034 214)"><circle cx="86" cy="86" r="112" fill="url(#core)"/><rect x="20" y="20" width="132" height="132" rx="34" fill="url(#glass)" stroke="#A8A5FF" stroke-opacity=".7" stroke-width="2"/><path d="M86 46 119 59v28c0 25-16 43-33 51-17-8-33-26-33-51V59l33-13Z" stroke="#9EE8F0" stroke-width="4" stroke-linejoin="round"/><path d="m71 86 11 11 21-24" stroke="#9EE8F0" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><circle cx="86" cy="86" r="75" stroke="#8D93FF" stroke-opacity=".3" stroke-dasharray="4 8"/></g>
+  <g fill="#ABB8FF" fill-opacity=".6"><circle cx="700" cy="300" r="2"/><circle cx="780" cy="520" r="2.5"/><circle cx="1460" cy="110" r="2"/><circle cx="1510" cy="380" r="2"/><circle cx="970" cy="520" r="2"/></g>
+</svg>

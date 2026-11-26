@@ -1,0 +1,295 @@
+{
+  "$defs": {
+    "ConfidencePolicy": {
+      "additionalProperties": false,
+      "description": "Thresholds and fallback rules for interpretation confidence assessment.",
+      "properties": {
+        "confidence_grants_authority": {
+          "const": false,
+          "default": false,
+          "title": "Confidence Grants Authority",
+          "type": "boolean"
+        },
+        "configuration_source": {
+          "const": "ORAI_CONFIDENCE_GATE_MODE",
+          "title": "Configuration Source",
+          "type": "string"
+        },
+        "default_mode": {
+          "const": "observe",
+          "default": "observe",
+          "title": "Default Mode",
+          "type": "string"
+        },
+        "enforce_behavior": {
+          "maxLength": 300,
+          "minLength": 1,
+          "title": "Enforce Behavior",
+          "type": "string"
+        },
+        "low_confidence_behavior": {
+          "const": "clarify_targeted_missing_information",
+          "title": "Low Confidence Behavior",
+          "type": "string"
+        },
+        "observe_behavior": {
+          "maxLength": 300,
+          "minLength": 1,
+          "title": "Observe Behavior",
+          "type": "string"
+        }
+      },
+      "required": [
+        "configuration_source",
+        "observe_behavior",
+        "enforce_behavior",
+        "low_confidence_behavior"
+      ],
+      "title": "ConfidencePolicy",
+      "type": "object"
+    },
+    "InterpreterPolicy": {
+      "additionalProperties": false,
+      "description": "Policy governing when and how model interpretation may be used.",
+      "properties": {
+        "assessment_calls_per_new_turn": {
+          "const": 1,
+          "default": 1,
+          "title": "Assessment Calls Per New Turn",
+          "type": "integer"
+        },
+        "format_recovery_calls": {
+          "default": 1,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Format Recovery Calls",
+          "type": "integer"
+        },
+        "may_authorize_actions": {
+          "const": false,
+          "default": false,
+          "title": "May Authorize Actions",
+          "type": "boolean"
+        },
+        "may_select_capabilities": {
+          "const": false,
+          "default": false,
+          "title": "May Select Capabilities",
+          "type": "boolean"
+        },
+        "may_select_tools": {
+          "const": false,
+          "default": false,
+          "title": "May Select Tools",
+          "type": "boolean"
+        },
+        "must_not_treat_empty_candidate_shortlist_as_out_of_scope": {
+          "const": true,
+          "default": true,
+          "title": "Must Not Treat Empty Candidate Shortlist As Out Of Scope",
+          "type": "boolean"
+        },
+        "must_preserve_all_supported_tasks": {
+          "const": true,
+          "default": true,
+          "title": "Must Preserve All Supported Tasks",
+          "type": "boolean"
+        },
+        "must_receive_decision_map": {
+          "const": true,
+          "default": true,
+          "title": "Must Receive Decision Map",
+          "type": "boolean"
+        }
+      },
+      "title": "InterpreterPolicy",
+      "type": "object"
+    },
+    "PreAssessmentRoute": {
+      "additionalProperties": false,
+      "description": "Declarative route considered before model-backed task interpretation.",
+      "properties": {
+        "enabled": {
+          "default": true,
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "handler": {
+          "enum": [
+            "academy_personal_read",
+            "workspace_navigation",
+            "workspace_knowledge",
+            "academy_education",
+            "connector_failure",
+            "canonical_read",
+            "assistant_capabilities",
+            "simple_social"
+          ],
+          "title": "Handler",
+          "type": "string"
+        },
+        "id": {
+          "maxLength": 80,
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "priority": {
+          "maximum": 1000,
+          "minimum": 0,
+          "title": "Priority",
+          "type": "integer"
+        },
+        "purpose": {
+          "maxLength": 400,
+          "minLength": 1,
+          "title": "Purpose",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "priority",
+        "handler",
+        "purpose"
+      ],
+      "title": "PreAssessmentRoute",
+      "type": "object"
+    },
+    "TaskDispatchRoute": {
+      "additionalProperties": false,
+      "description": "Declarative route from a resolved task class to its registered execution owner.",
+      "properties": {
+        "applicable_confidence_dimensions": {
+          "items": {
+            "enum": [
+              "intent",
+              "slot",
+              "entity"
+            ],
+            "type": "string"
+          },
+          "title": "Applicable Confidence Dimensions",
+          "type": "array"
+        },
+        "handler": {
+          "enum": [
+            "registered_resource",
+            "occf_read",
+            "registered_presentation",
+            "registered_workflow",
+            "registered_frontend_action",
+            "preserve_and_clarify",
+            "explain_supported_scope"
+          ],
+          "title": "Handler",
+          "type": "string"
+        },
+        "low_confidence_behavior": {
+          "enum": [
+            "clarify_resource_or_topic",
+            "clarify_missing_read_scope",
+            "clarify_missing_presentation_inputs",
+            "preserve_workflow_and_clarify",
+            "clarify_action_target",
+            "preserve_task_and_clarify",
+            "offer_supported_scope"
+          ],
+          "title": "Low Confidence Behavior",
+          "type": "string"
+        },
+        "purpose": {
+          "maxLength": 500,
+          "minLength": 1,
+          "title": "Purpose",
+          "type": "string"
+        },
+        "task_class": {
+          "enum": [
+            "resource",
+            "mcp_read",
+            "presentation",
+            "workflow",
+            "frontend_action",
+            "clarification",
+            "unsupported"
+          ],
+          "title": "Task Class",
+          "type": "string"
+        }
+      },
+      "required": [
+        "task_class",
+        "handler",
+        "low_confidence_behavior",
+        "purpose"
+      ],
+      "title": "TaskDispatchRoute",
+      "type": "object"
+    }
+  },
+  "$id": "https://oraiflow.local/contracts/decision-routing/1.0.0/schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Validated configuration for deterministic pre-assessment and task dispatch.",
+  "properties": {
+    "confidence": {
+      "$ref": "#/$defs/ConfidencePolicy"
+    },
+    "description": {
+      "maxLength": 500,
+      "minLength": 1,
+      "title": "Description",
+      "type": "string"
+    },
+    "interpreter": {
+      "$ref": "#/$defs/InterpreterPolicy"
+    },
+    "policy_id": {
+      "maxLength": 80,
+      "minLength": 1,
+      "title": "Policy Id",
+      "type": "string"
+    },
+    "pre_assessment_routes": {
+      "items": {
+        "$ref": "#/$defs/PreAssessmentRoute"
+      },
+      "maxItems": 20,
+      "minItems": 1,
+      "title": "Pre Assessment Routes",
+      "type": "array"
+    },
+    "revision": {
+      "minimum": 1,
+      "title": "Revision",
+      "type": "integer"
+    },
+    "schema_version": {
+      "const": "1.0.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "task_dispatch": {
+      "items": {
+        "$ref": "#/$defs/TaskDispatchRoute"
+      },
+      "maxItems": 7,
+      "minItems": 7,
+      "title": "Task Dispatch",
+      "type": "array"
+    }
+  },
+  "required": [
+    "schema_version",
+    "policy_id",
+    "revision",
+    "description",
+    "pre_assessment_routes",
+    "task_dispatch",
+    "interpreter",
+    "confidence"
+  ],
+  "title": "DecisionRoutingPolicy",
+  "type": "object"
+}

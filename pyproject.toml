@@ -1,0 +1,80 @@
+[project]
+name = "oraiflow"
+version = "0.7.7"
+description = "Synthetic-data reference framework for agent-assisted financial workflows."
+readme = "README.md"
+requires-python = ">=3.12"
+license = { file = "LICENSE" }
+authors = [
+    { name = "AIGENSYS", email = "info@aigensys.com" },
+    { name = "Michal Ricar", email = "michal.ricar@aigensys.com" }
+]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Console",
+  "Framework :: FastAPI",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: Apache Software License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Office/Business :: Financial",
+  "Topic :: Software Development :: Libraries :: Application Frameworks",
+]
+dependencies = [
+  "fastapi>=0.115,<1",
+  "uvicorn[standard]>=0.34,<1",
+  "pydantic>=2.10,<3",
+  "pydantic-settings>=2.7,<3",
+  "sqlalchemy>=2.0,<3",
+  "psycopg[binary,pool]>=3.2,<4",
+  "httpx>=0.28,<1",
+  "langgraph>=0.3,<2",
+  "langgraph-checkpoint-postgres>=2.0,<4",
+  "langchain-core>=0.3,<2",
+  "langchain-openai>=0.3,<2",
+  "langchain-ollama>=0.3,<2",
+  "langchain-anthropic>=0.3,<2",
+  "mcp>=1.30,<2",
+  "temporalio>=1.9,<2",
+  "ag-ui-langgraph>=0.0.1,<1",
+  "copilotkit>=0.1.78,<0.2",
+  "jsonschema>=4.23,<5",
+]
+
+[dependency-groups]
+dev = [
+  "pytest>=8,<9",
+  "pytest-asyncio>=0.24,<2",
+  "black>=26.10.1,<27",
+  "ruff>=0.17.6,<0.18",
+]
+
+[tool.uv]
+# ORAIflow Core is an executable multi-service application, not a PyPI library.
+# uv manages its environment and dependencies without installing the repository
+# root as a distributable Python package.
+package = false
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+addopts = "-ra"
+asyncio_mode = "auto"
+
+[tool.black]
+line-length = 100
+target-version = ["py312"]
+
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["services", "shared", "scripts", "tests"]
+
+[tool.ruff.lint]
+# Start with correctness-focused rules; Black owns whitespace and layout.
+select = ["E4", "E7", "E9", "F821", "F822", "F823"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"

@@ -1,0 +1,104 @@
+name: ORAIflow Core CI
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: oraiflow_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U test -d oraiflow_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgresql+psycopg://test:test@localhost:5432/oraiflow_test
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.10.0"
+          python-version: "3.12"
+      - name: Resolve Python dependencies and install the development environment
+        run: |
+          if [ -f uv.lock ]; then
+            uv lock --check
+          else
+            uv lock
+          fi
+          uv sync --locked --group dev
+      - name: Verify Black formatting for changed Python files
+        env:
+          CI_EVENT_NAME: ${{ github.event_name }}
+          CI_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          CI_BEFORE_SHA: ${{ github.event.before }}
+          CI_HEAD_SHA: ${{ github.sha }}
+        run: uv run --locked python scripts/check_changed_black.py
+      - name: Compile Python services and contract scripts
+        run: uv run --locked python -m compileall -q services shared tests scripts
+      - name: Run Ruff correctness lint (including parser and undefined-name checks)
+        run: uv run --locked ruff check --output-format=github services shared tests scripts
+      - name: Check production docstring coverage
+        run: uv run --locked python scripts/check_docstrings.py
+      - name: Check generated frontend contracts
+        run: uv run --locked python scripts/generate_contracts.py --check
+      - name: Run deterministic policy and contract conformance tests
+        run: uv run --locked pytest -q
+      - name: Validate Compose configuration
+        run: |
+          cp .env.example .env
+          docker compose config -q
+
+  frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install frontend dependencies
+        run: npm install --no-audit --no-fund
+      - name: Run frontend behavior tests
+        run: npm test
+      - name: Build frontend
+        run: npm run build
+
+  copilot-runtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: services/copilot_runtime
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install Copilot Runtime dependencies
+        run: npm install --no-audit --no-fund
+      - name: Check Copilot Runtime JavaScript syntax
+        run: node --check server.js

@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="600" viewBox="0 0 1600 600" fill="none">
+  <title>Aurora Flow</title>
+  <desc>Flowing teal and emerald aurora ribbons frame a precise financial data visualization.</desc>
+  <defs>
+    <linearGradient id="bg" x1="60" y1="30" x2="1500" y2="580" gradientUnits="userSpaceOnUse"><stop stop-color="#061A2B"/><stop offset=".5" stop-color="#082F3A"/><stop offset="1" stop-color="#102C3D"/></linearGradient>
+    <linearGradient id="ribbon1" x1="180" y1="560" x2="1320" y2="50" gradientUnits="userSpaceOnUse"><stop stop-color="#24C5B5" stop-opacity="0"/><stop offset=".42" stop-color="#49D8C6" stop-opacity=".52"/><stop offset=".78" stop-color="#66DCEA" stop-opacity=".32"/><stop offset="1" stop-color="#66DCEA" stop-opacity="0"/></linearGradient>
+    <linearGradient id="ribbon2" x1="260" y1="10" x2="1450" y2="570" gradientUnits="userSpaceOnUse"><stop stop-color="#80E2B8" stop-opacity="0"/><stop offset=".5" stop-color="#57D7AC" stop-opacity=".36"/><stop offset="1" stop-color="#55BBD8" stop-opacity="0"/></linearGradient>
+    <radialGradient id="glow"><stop stop-color="#43D9B6" stop-opacity=".24"/><stop offset="1" stop-color="#43D9B6" stop-opacity="0"/></radialGradient>
+    <linearGradient id="glass" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#104553" stop-opacity=".9"/><stop offset="1" stop-color="#0C293C" stop-opacity=".92"/></linearGradient>
+    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse"><path d="M48 0H0V48" stroke="#90E5D4" stroke-opacity=".06"/></pattern>
+    <filter id="blur" x="500" y="-80" width="1000" height="760"><feGaussianBlur stdDeviation="56"/></filter>
+  </defs>
+  <path fill="url(#bg)" d="M0 0h1600v600H0z"/><path fill="url(#grid)" d="M0 0h1600v600H0z"/><ellipse cx="1120" cy="295" rx="390" ry="270" fill="url(#glow)" filter="url(#blur)"/>
+  <g fill="none" stroke-linecap="round"><path d="M410 620C610 350 700 40 1010 68c232 21 281 247 650 150" stroke="url(#ribbon1)" stroke-width="48"/><path d="M250 640C490 390 610 170 850 162c310-11 350 240 770 196" stroke="url(#ribbon2)" stroke-width="34"/><path d="M550 650C710 440 845 280 1030 284c207 4 315 178 570 149" stroke="url(#ribbon1)" stroke-opacity=".72" stroke-width="12"/><path d="M650 -80C800 110 920 205 1120 192c185-12 280-140 520-116" stroke="url(#ribbon2)" stroke-width="24"/></g>
+  <g transform="translate(970 160)"><rect width="340" height="250" rx="24" fill="url(#glass)" stroke="#8BE5D4" stroke-opacity=".46" stroke-width="2"/><path d="M28 52h284" stroke="#8BE5D4" stroke-opacity=".24"/><g fill="#C0F2E5" fill-opacity=".65"><rect x="34" y="80" width="56" height="10" rx="5"/><rect x="34" y="106" width="92" height="7" rx="3.5" fill-opacity=".28"/><rect x="34" y="132" width="75" height="7" rx="3.5" fill-opacity=".28"/></g><g transform="translate(148 82)"><path d="M0 96V62h26v34M42 96V38h26v58M84 96V10h26v86" fill="#55D4B7" fill-opacity=".27" stroke="#7CE5CB" stroke-width="2"/><path d="m8 52 47-27 39-17" stroke="#C1EFA4" stroke-width="3" stroke-linecap="round"/><circle cx="94" cy="8" r="5" fill="#C1EFA4"/></g><circle cx="282" cy="36" r="6" fill="#8AE8D7"/></g>
+  <g stroke="#80E1D2" stroke-opacity=".5"><path d="M820 110 915 160 970 145M1310 410l120 64 92-26M780 462l110-58 80 30"/><circle cx="820" cy="110" r="5" fill="#80E1D2"/><circle cx="1430" cy="474" r="5" fill="#80E1D2"/><circle cx="780" cy="462" r="5" fill="#80E1D2"/></g>
+  <g fill="#9BEEDC" fill-opacity=".55"><circle cx="680" cy="90" r="2"/><circle cx="860" cy="520" r="2"/><circle cx="1490" cy="118" r="2"/><circle cx="540" cy="380" r="2"/><circle cx="1200" cy="530" r="2"/></g>
+</svg>

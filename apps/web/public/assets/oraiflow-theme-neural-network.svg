@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="600" viewBox="0 0 1600 600" fill="none">
+  <title>Neural Network</title>
+  <desc>Abstract fintech network with connected nodes, data paths and a luminous central intelligence core.</desc>
+  <defs>
+    <linearGradient id="bg" x1="80" y1="20" x2="1510" y2="580" gradientUnits="userSpaceOnUse"><stop stop-color="#06172C"/><stop offset=".55" stop-color="#092B46"/><stop offset="1" stop-color="#101D40"/></linearGradient>
+    <radialGradient id="glow" cx="0" cy="0" r="1" gradientTransform="matrix(0 320 -470 0 1120 270)" gradientUnits="userSpaceOnUse"><stop stop-color="#27C6DA" stop-opacity=".30"/><stop offset="1" stop-color="#27C6DA" stop-opacity="0"/></radialGradient>
+    <linearGradient id="wire" x1="440" y1="80" x2="1500" y2="520" gradientUnits="userSpaceOnUse"><stop stop-color="#39D7E5" stop-opacity="0"/><stop offset=".48" stop-color="#63DCE8" stop-opacity=".72"/><stop offset="1" stop-color="#A39AFF" stop-opacity=".12"/></linearGradient>
+    <linearGradient id="panel" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#123E59" stop-opacity=".92"/><stop offset="1" stop-color="#101D3A" stop-opacity=".68"/></linearGradient>
+    <filter id="blur" x="700" y="-30" width="850" height="690" color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="52"/></filter>
+    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse"><path d="M48 0H0V48" stroke="#6ADCE8" stroke-opacity=".07" stroke-width="1"/></pattern>
+  </defs>
+  <path fill="url(#bg)" d="M0 0h1600v600H0z"/><path fill="url(#grid)" d="M0 0h1600v600H0z"/><path fill="url(#glow)" d="M0 0h1600v600H0z"/>
+  <ellipse cx="1140" cy="292" fill="#29BED4" fill-opacity=".22" filter="url(#blur)" rx="290" ry="210"/>
+  <g stroke="url(#wire)" stroke-width="2">
+    <path d="M610 470 760 340l150 80 155-170 145 80 180-160"/><path d="m700 150 130 90 170-60 125 70 180-90"/><path d="m760 340 70-100 100 180 145-170 65 150 230-80"/>
+    <path d="M910 420 1000 180 1165 310 1300 160 1470 340" stroke-opacity=".55"/><path d="m830 240 80 180 300 0 170-80" stroke-opacity=".34"/>
+    <path d="m1055 250 110 60 145-150m-145 150 65 150" stroke-dasharray="5 10" stroke-opacity=".65"/>
+  </g>
+  <g fill="#102E49" stroke="#58D9E5" stroke-width="2"><circle cx="610" cy="470" r="8"/><circle cx="700" cy="150" r="7"/><circle cx="760" cy="340" r="9"/><circle cx="830" cy="240" r="7"/><circle cx="910" cy="420" r="9"/><circle cx="1055" cy="250" r="7"/><circle cx="1165" cy="310" r="10"/><circle cx="1300" cy="160" r="8"/><circle cx="1470" cy="340" r="8"/></g>
+  <g fill="#8BF2EE"><circle cx="760" cy="340" r="3"/><circle cx="1165" cy="310" r="4"/><circle cx="1300" cy="160" r="3"/></g>
+  <circle cx="1120" cy="292" r="142" stroke="#61DCE9" stroke-opacity=".18" stroke-width="1.5"/><circle cx="1120" cy="292" r="186" stroke="#61DCE9" stroke-opacity=".11" stroke-width="1.5" stroke-dasharray="4 12"/>
+  <g transform="translate(1010 207)"><rect width="220" height="170" rx="24" fill="url(#panel)" stroke="#8BEAF0" stroke-opacity=".42"/><rect x="22" y="22" width="176" height="126" rx="16" stroke="#66DDE8" stroke-opacity=".2"/><path d="M48 65h124M48 88h82M48 111h100" stroke="#75E2EA" stroke-opacity=".7" stroke-width="5" stroke-linecap="round"/><circle cx="171" cy="111" r="10" fill="#62E2D9" fill-opacity=".8"/><circle cx="171" cy="111" r="19" stroke="#62E2D9" stroke-opacity=".45"/></g>
+  <g fill="#A8F0F0" fill-opacity=".55"><circle cx="930" cy="115" r="2"/><circle cx="1378" cy="442" r="3"/><circle cx="1500" cy="112" r="2"/><circle cx="810" cy="510" r="2"/><circle cx="1260" cy="520" r="2"/></g>
+</svg>
