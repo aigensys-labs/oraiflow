@@ -2,7 +2,7 @@
 
 ## Scope and support
 
-ORAIflow Core is a synthetic-data reference implementation, not a production banking service. Security fixes for the public source are handled on a best-effort basis. No release is certified for use with real customer data, real funds or production credentials.
+ORAIflow is a synthetic-data reference implementation, not a production banking service. Security fixes for the public source are handled on a best-effort basis. No release is certified for use with real customer data, real funds or production credentials.
 
 ## Reporting a vulnerability
 

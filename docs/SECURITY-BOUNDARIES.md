@@ -1,6 +1,6 @@
 # Security boundaries and production gaps
 
-ORAIflow Core is a local/self-hosted reference implementation using fictional customer and ledger data. Its central security objective is to prevent probabilistic model output from becoming financial authority.
+ORAIflow is a local/self-hosted reference implementation using fictional customer and ledger data. Its central security objective is to prevent probabilistic model output from becoming financial authority.
 
 ## What the current local slice enforces
 

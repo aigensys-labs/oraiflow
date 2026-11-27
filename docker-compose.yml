@@ -1,4 +1,4 @@
-name: oraiflow-core
+name: oraiflow
 
 x-runtime-env: &runtime-env
   CUSTOM_CA_FILE: ${CUSTOM_CA_FILE:-./certs/internal-ca.crt}
@@ -255,3 +255,5 @@ services:
 
 volumes:
   postgres-data:
+    # Preserve the existing volume name when changing the Compose project to "oraiflow".
+    name: oraiflow-core_postgres-data

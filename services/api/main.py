@@ -47,7 +47,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="ORAIflow Core API",
+    title="ORAIflow API",
     description="Local fintech reference API. Synthetic financial data only.",
     version=__version__,
     lifespan=lifespan,
@@ -312,7 +312,7 @@ async def config():
             "model_data_policy": "unavailable",
         }
     return {
-        "product": "ORAIflow Core",
+        "product": "ORAIflow",
         "version": __version__,
         "workspace_name": os.getenv("DEMO_WORKSPACE_NAME", "Atlas Fintech").strip()
         or "Atlas Fintech",

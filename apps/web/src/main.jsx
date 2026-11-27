@@ -13,6 +13,7 @@ import { CopilotKitProvider, CopilotChatToolCallsView, useComponent, useRenderTo
 import { useAgent, useCopilotKit, useAgentContext, useFrontendTool } from '@copilotkit/react-core/v2/headless'
 import { capabilitySchema, presentationSchema, presentationContract, executeFrontendCapability, validateApplicationContext, resolveWorkspace, ACADEMY_TOPICS, ASSISTANT_CAPABILITIES, ASSISTANT_CAPABILITY_CATALOGUE_VERSION, AGENT_TURN_CONTRACT_VERSION, WORKSPACE_CATALOGUE, WORKSPACE_CATALOGUE_VERSION } from './contracts.js'
 import { advanceManualNavigationEpoch, executeNavigationOnce, isNavigationEpochCurrent } from './navigation-actions.js'
+import { transferDraftReplayDecision } from './transfer-action-guard.js'
 import { auditDetailEntries } from './audit-details.js'
 import { getMessageRevealState, saveMessageRevealState } from './message-stream-state.js'
 import './styles.css'
@@ -75,7 +76,7 @@ function Mark({ compact = false }) {
 
 function WorkspaceFooter({ providerLabel }) {
   return <footer className="page-footer">
-    <div><Mark compact /><span>ORAIflow Core <b>·</b> Synthetic demo framework</span></div>
+    <div><Mark compact /><span>ORAIflow <b>·</b> Synthetic demo framework</span></div>
     <div className="footer-right">
       <span className="footer-provider"><span className="online-dot" /> {providerLabel}</span>
       <span>Build {packageMetadata.version}</span>
@@ -1245,6 +1246,7 @@ function App() {
   const [transferDraft, setTransferDraft] = useState(null)
   const [transferDraftLifecycle, setTransferDraftLifecycle] = useState(null)
   const transferActionReceipts = useRef(new Map())
+  const transferActionRuntimeRef = useRef(null)
   const [config, setConfig] = useState(null)
   const [transactions, setTransactions] = useState([])
   const [contacts, setContacts] = useState([])
@@ -1429,6 +1431,15 @@ function App() {
   // ref, so a navigation state change cannot unregister and re-register an
   // in-flight tool action.
   navigationActionRuntimeRef.current = { navigate, context: agentApplicationContext, navigationEpoch: manualNavigationEpochRef.current }
+  // The transfer frontend tool must stay registered while its handler updates
+  // draft lifecycle state. CopilotKit refreshes useFrontendTool registration
+  // when a dependency changes; keeping the handler dependency-free and reading
+  // current state through this ref prevents an in-flight browser action from
+  // being unregistered/re-registered mid-call.
+  transferActionRuntimeRef.current = {
+    accounts, contacts, transferDraftLifecycle, transferDraft, showTransfer,
+    context: agentApplicationContext,
+  }
   useFrontendTool({
     name: 'navigate_workspace',
     description: 'Navigate only to an existing ORAIflow workspace. The application validates the allowlist independently.',
@@ -1476,38 +1487,60 @@ function App() {
     name: 'prepare_transfer_draft',
     description: 'Open an editable transfer form only. This action does not preview, approve, authenticate or submit a payment.',
     parameters: capabilitySchema('frontend.transfer.prepare_draft'),
-    handler: (args) => executeFrontendCapability('frontend.transfer.prepare_draft', args, async ({ beneficiary, beneficiary_contact_id, amount, currency, from_account_id, workflow_id, action_id }) => {
-      const receipt = transferActionReceipts.current.get(action_id)
-        || (transferDraftLifecycle?.action_id === action_id ? transferDraftLifecycle : null)
-      if (receipt?.status === 'open') {
-        return { status: 'draft_opened', workflow_id, action_id, message: 'The same editable transfer draft is already open.' }
+    handler: (args) => {
+      const runtime = transferActionRuntimeRef.current || {
+        accounts, contacts, transferDraftLifecycle, transferDraft, showTransfer,
+        context: agentApplicationContext,
       }
-      if (receipt) {
-        return { status: 'rejected', workflow_id, action_id, reason: 'This draft action has already been dismissed or completed and cannot be reopened.' }
-      }
-      const numericAmount = Number(amount)
-      const source = accounts.find((account) => account.account_id === from_account_id && account.currency === currency)
-      if (!source) return { status: 'rejected', workflow_id, action_id, reason: 'Source account is unavailable or has a different currency.' }
-      const contact = contacts.find((item) => item.contact_id === beneficiary_contact_id && item.status === 'ACTIVE')
-      if (!contact || contact.full_name.trim().toLocaleLowerCase() !== beneficiary.trim().toLocaleLowerCase() || contact.currency !== currency) {
-        return { status: 'rejected', workflow_id, action_id, reason: 'The beneficiary does not match an active saved contact in the requested currency.' }
-      }
-      if (!Number.isFinite(numericAmount) || numericAmount <= 0 || !workflow_id || !action_id) {
-        return { status: 'rejected', workflow_id, action_id, reason: 'The transfer draft parameters or action identifiers are invalid.' }
-      }
-      const proposal = {
-        type: 'transfer_draft_proposal', beneficiary: contact.full_name,
-        beneficiary_contact_id: contact.contact_id,
-        beneficiary_contact: { full_name: contact.full_name, bank_name: contact.bank_name, account_reference_masked: contact.account_reference_masked },
-        amount, currency, from_account_id, workflow_id, action_id,
-      }
-      transferActionReceipts.current.set(action_id, { workflow_id, action_id, status: 'open' })
-      setTransferDraftLifecycle({ workflow_id, action_id, status: 'open' })
-      setTransferDraft(proposal)
-      setShowTransfer(true)
-      return { status: 'draft_opened', workflow_id, action_id, message: 'An editable transfer draft for the verified saved contact is open. Nothing has been previewed, approved or submitted.' }
-    }, { context: agentApplicationContext }),
-  }, [accounts, contacts, transferDraftLifecycle])
+      return executeFrontendCapability('frontend.transfer.prepare_draft', args, async ({ beneficiary, beneficiary_contact_id, amount, currency, from_account_id, workflow_id, action_id }) => {
+        const replay = transferDraftReplayDecision({
+          receipts: transferActionReceipts.current,
+          workflowId: workflow_id,
+          actionId: action_id,
+          lifecycle: runtime.transferDraftLifecycle,
+          visibleDraft: runtime.transferDraft,
+          modalOpen: runtime.showTransfer,
+        })
+        if (replay.kind === 'already_open') {
+          console.info('[ORAIflow transfer] duplicate draft action suppressed', { workflow_id, action_id })
+          return { status: 'draft_opened', workflow_id, action_id, message: 'The editable transfer draft for this request is already open. No second draft was created.' }
+        }
+        if (replay.kind !== 'open') {
+          console.warn('[ORAIflow transfer] draft replay rejected', { workflow_id, action_id, reason: replay.kind })
+          const reason = replay.kind === 'another_draft_open'
+            ? 'Another editable transfer draft is already open. Close it before preparing another draft.'
+            : replay.kind === 'already_terminal'
+              ? 'This transfer draft was already closed or completed and cannot be reopened by a delayed action.'
+              : 'The transfer action identifiers do not match the recorded request.'
+          return { status: 'rejected', workflow_id, action_id, reason }
+        }
+        const numericAmount = Number(amount)
+        const source = runtime.accounts.find((account) => account.account_id === from_account_id && account.currency === currency)
+        if (!source) return { status: 'rejected', workflow_id, action_id, reason: 'Source account is unavailable or has a different currency.' }
+        const contact = runtime.contacts.find((item) => item.contact_id === beneficiary_contact_id && item.status === 'ACTIVE')
+        if (!contact || contact.full_name.trim().toLocaleLowerCase() !== beneficiary.trim().toLocaleLowerCase() || contact.currency !== currency) {
+          return { status: 'rejected', workflow_id, action_id, reason: 'The beneficiary does not match an active saved contact in the requested currency.' }
+        }
+        if (!Number.isFinite(numericAmount) || numericAmount <= 0 || !workflow_id || !action_id) {
+          return { status: 'rejected', workflow_id, action_id, reason: 'The transfer draft parameters or action identifiers are invalid.' }
+        }
+        const proposal = {
+          type: 'transfer_draft_proposal', beneficiary: contact.full_name,
+          beneficiary_contact_id: contact.contact_id,
+          beneficiary_contact: { full_name: contact.full_name, bank_name: contact.bank_name, account_reference_masked: contact.account_reference_masked },
+          amount, currency, from_account_id, workflow_id, action_id,
+        }
+        // Record the one-shot receipt synchronously before scheduling React
+        // state updates. Any concurrent/replayed invocation sees this entry.
+        transferActionReceipts.current.set(action_id, { workflow_id, action_id, status: 'open' })
+        setTransferDraftLifecycle({ workflow_id, action_id, status: 'open' })
+        setTransferDraft(proposal)
+        setShowTransfer(true)
+        console.info('[ORAIflow transfer] editable draft opened', { workflow_id, action_id })
+        return { status: 'draft_opened', workflow_id, action_id, message: 'An editable transfer draft for the verified saved contact is open. Nothing has been previewed, approved or submitted.' }
+      }, { context: runtime.context || agentApplicationContext })
+    },
+  }, [])
   const dateLabel = new Intl.DateTimeFormat('en-GB', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' }).format(new Date()).toUpperCase()
 
   let content

@@ -47,6 +47,9 @@ from shared.transfer_workflow import (
     currency_choice_prompt,
     resolve_search_result,
     resolve_source_account_reply,
+    transfer_draft_replay_status,
+    transfer_operation_id,
+    transfer_workflow_id,
     with_workflow,
 )
 from shared.transfer_slot_reconciliation import reconcile_explicit_transfer_slots
@@ -2112,7 +2115,12 @@ def _verified_tool_data_diagnostic(
 
 
 def _internal_read_tool_call(tool_name: str, workflow: dict[str, Any]) -> AIMessage:
-    call_id = f"oraiflow-workflow-read-{uuid.uuid4().hex}"
+    workflow_id = str(workflow.get("workflow_id", ""))
+    stage = str(workflow.get("stage", ""))
+    call_id = (
+        "oraiflow-workflow-read-"
+        + transfer_operation_id(workflow_id, f"read:{tool_name}:{stage}")[4:]
+    )
     # The frontend already renders live tool activity for this read. Keep the
     # assistant conversation reserved for clarifications and the one terminal
     # draft acknowledgement, rather than emitting duplicate progress prose.
@@ -2382,9 +2390,98 @@ def _start_explicit_transfer_workflow(
     if not messages or message_type(messages[-1]) != "human":
         return None
     text = latest_human_text(messages)
-    workflow = build_explicit_transfer_workflow(text, context)
+    thread_id = str(
+        state.get("thread_id") or state.get("threadId") or state.get("conversation_id") or ""
+    )
+    request_workflow_id = transfer_workflow_id(messages, thread_id)
+    workflow = build_explicit_transfer_workflow(text, context, workflow_id=request_workflow_id)
     if not workflow:
         return None
+
+    # Browser context is an idempotency receipt, not permission to execute a
+    # transfer. Only one editable draft can be open in this workspace at a time.
+    # This broader guard also protects against a malformed AG-UI replay that
+    # reconstructs the same visible request with a new message/workflow ID.
+    active_draft = context.get("transfer_draft_state")
+    if isinstance(active_draft, dict) and str(active_draft.get("status", "")).casefold() == "open":
+        active_workflow_id = str(active_draft.get("workflow_id", ""))
+        active_action_id = str(active_draft.get("action_id", ""))
+        if (
+            active_workflow_id
+            and active_action_id
+            and (
+                active_workflow_id != workflow.get("workflow_id")
+                or active_action_id != workflow.get("action_id")
+            )
+        ):
+            logger.info(
+                "transfer_workflow_replay_suppressed trace_id=%s workflow_id=%s active_workflow_id=%s status=another_draft_open",
+                current_trace_id(),
+                workflow.get("workflow_id"),
+                active_workflow_id,
+            )
+            receipt = {
+                "capability_id": "frontend.transfer.prepare_draft",
+                "workflow_id": active_workflow_id,
+                "action_id": active_action_id,
+                "status": "draft_opened",
+            }
+            return _frontend_action_ack_message(
+                "An editable transfer draft is already open. Close it before preparing another transfer draft.",
+                receipt,
+            )
+
+    # If this exact customer message is replayed after its draft was
+    # opened/closed/accepted, return a final acknowledgement without repeating
+    # contact search, account reads or the draft-opening action.
+    draft_status = transfer_draft_replay_status(workflow, active_draft)
+    if draft_status == "open":
+        content = (
+            "The editable transfer draft for this request is already open. "
+            "I haven't created another draft."
+        )
+        status = "draft_opened"
+    elif draft_status in {"dismissed", "closed"}:
+        content = (
+            "You already closed the editable transfer draft for this request. "
+            "I won't reopen it automatically. Send a new transfer request if you still need one."
+        )
+        status = "draft_closed"
+    elif draft_status == "accepted":
+        content = (
+            "This transfer draft was already accepted by the workspace. "
+            "I won't create another draft for the same request."
+        )
+        status = "draft_accepted"
+    else:
+        content = ""
+        status = ""
+    if status:
+        receipt = {
+            "capability_id": "frontend.transfer.prepare_draft",
+            "workflow_id": str(workflow.get("workflow_id", "")),
+            "action_id": str(workflow.get("action_id", "")),
+            "status": status,
+        }
+        workflow["stage"] = (
+            "DRAFT_OPENED"
+            if status == "draft_opened"
+            else "COMPLETED" if status == "draft_accepted" else "DISMISSED"
+        )
+        logger.info(
+            "transfer_workflow_replay_suppressed trace_id=%s workflow_id=%s status=%s",
+            current_trace_id(),
+            workflow.get("workflow_id"),
+            status,
+        )
+        return _workflow_message(
+            content,
+            workflow,
+            additional_kwargs={"oraiflow_frontend_action_receipt": receipt},
+            action_ack=True,
+            action_id=str(workflow.get("action_id", "")),
+        )
+
     capability_id = "banking.contacts.search"
     capability = get_capability(capability_id)
     search_arguments = {"name_query": str(workflow.get("beneficiary_query", "")).strip()}
@@ -2400,7 +2497,10 @@ def _start_explicit_transfer_workflow(
             "I understood the transfer amount, but couldn't validate the recipient search request. No draft was opened.",
             workflow,
         )
-    call_id = f"oraiflow-transfer-contact-search-{uuid.uuid4().hex}"
+    call_id = (
+        "oraiflow-transfer-contact-search-"
+        + transfer_operation_id(str(workflow["workflow_id"]), "contact-search")[4:]
+    )
     message = AIMessage(
         content="",
         tool_calls=[
@@ -2440,6 +2540,11 @@ def _handle_transfer_workflow(state: ORAIState, context: dict[str, Any]) -> AIMe
         stage,
         getattr(messages[-1], "type", "") if messages else "none",
     )
+    # Apply the latest browser lifecycle before checking terminal states. In
+    # particular, DRAFT_OPENED must become DISMISSED/COMPLETED when the customer
+    # closes or accepts the modal; checking terminality first loses that update.
+    workflow = apply_frontend_dismissal(workflow, context.get("transfer_draft_state"))
+    stage = str(workflow.get("stage", ""))
     terminal = {
         "CANCELLED",
         "CONTACT_NOT_FOUND",
@@ -2451,9 +2556,6 @@ def _handle_transfer_workflow(state: ORAIState, context: dict[str, Any]) -> AIMe
     }
     if stage in terminal:
         return None
-
-    workflow = apply_frontend_dismissal(workflow, context.get("transfer_draft_state"))
-    stage = str(workflow.get("stage", ""))
     last = messages[-1] if messages else None
     last_type = message_type(last)
     last_name = str(message_value(last, "name", "") or "")

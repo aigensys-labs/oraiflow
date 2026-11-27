@@ -1,4 +1,4 @@
-name: ORAIflow Core CI
+name: ORAIflow CI
 
 permissions:
   contents: read

@@ -1,6 +1,6 @@
 [project]
 name = "oraiflow"
-version = "0.7.8"
+version = "0.7.10"
 description = "Synthetic-data reference framework for agent-assisted financial workflows."
 readme = "README.md"
 requires-python = ">=3.12"

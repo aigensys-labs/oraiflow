@@ -1,8 +1,8 @@
-# ORAIflow Core — Notice
+# ORAIflow — Notice
 
 ## Nature and permitted purpose
 
-ORAIflow Core is a demonstration and educational reference framework for agent-assisted financial workflows. It is a simulation, not a bank, credit institution, payment service provider, investment firm, financial adviser, broker, insurer or other regulated financial institution or professional service. It is not designed, validated or approved for real customer accounts, funds, payment instructions, credit decisions or other real-world financial activity.
+ORAIflow is a demonstration and educational reference framework for agent-assisted financial workflows. It is a simulation, not a bank, credit institution, payment service provider, investment firm, financial adviser, broker, insurer or other regulated financial institution or professional service. It is not designed, validated or approved for real customer accounts, funds, payment instructions, credit decisions or other real-world financial activity.
 
 ## Synthetic data and simulated controls
 

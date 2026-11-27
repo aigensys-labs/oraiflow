@@ -1,6 +1,5 @@
 # ORAIflow documentation
 
-**Source package:** `v0.7.8`  
 **OCCF registry:** `1.5.17`
 
 This index is the entry point for the stable documentation shipped with the source repository. The root [README](../README.md) introduces the project and local startup.
@@ -35,4 +34,4 @@ This index is the entry point for the stable documentation shipped with the sour
 
 ## Important product boundary
 
-ORAIflow Core v0.7.8 is a self-hosted reference implementation built around synthetic demo identity, records, credentials, SCA and a local ledger. It is not a bank, a regulated payment product or a production-ready financial service. Model interpretation, financial-data authority and consequential command authorization remain separate responsibilities; a component being present in source or a unit test passing does not establish live institutional readiness.
+ORAIflow is a self-hosted reference implementation built around synthetic demo identity, records, credentials, SCA and a local ledger. It is not a bank, a regulated payment product or a production-ready financial service. Model interpretation, financial-data authority and consequential command authorization remain separate responsibilities; a component being present in source or a unit test passing does not establish live institutional readiness.

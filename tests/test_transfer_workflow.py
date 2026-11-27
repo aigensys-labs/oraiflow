@@ -16,6 +16,9 @@ from shared.transfer_workflow import (
     resolve_currency_reply,
     resolve_search_result,
     resolve_source_account_reply,
+    transfer_draft_replay_status,
+    transfer_operation_id,
+    transfer_workflow_id,
 )
 
 ACCOUNTS = [
@@ -886,3 +889,67 @@ def test_negated_source_preference_does_not_select_highest_balance():
     assert status == "UNRELATED"
     assert updated.get("source_account_preference") in (None, "")
     assert updated["stage"] == "AWAITING_CURRENCY"
+
+
+def test_transfer_workflow_identity_is_stable_for_the_same_agui_message():
+    from types import SimpleNamespace
+
+    request = SimpleNamespace(
+        type="human", id="user-message-123", content="send 50 EUR to Lucas from everyday"
+    )
+    replay = SimpleNamespace(
+        type="human", id="user-message-123", content="send 50 EUR to Lucas from everyday"
+    )
+    assert transfer_workflow_id([request], "thread-abc") == transfer_workflow_id(
+        [replay], "thread-abc"
+    )
+
+
+def test_transfer_workflow_identity_changes_for_a_new_customer_message():
+    from types import SimpleNamespace
+
+    first = SimpleNamespace(
+        type="human", id="user-message-123", content="send 50 EUR to Lucas from everyday"
+    )
+    second = SimpleNamespace(
+        type="human", id="user-message-124", content="send 50 EUR to Lucas from everyday"
+    )
+    assert transfer_workflow_id([first], "thread-abc") != transfer_workflow_id(
+        [second], "thread-abc"
+    )
+
+
+def test_transfer_action_and_operation_ids_are_stable_per_workflow():
+    first = build_explicit_transfer_workflow(
+        "send 50 EUR to Lucas", CONTEXT, workflow_id="trf-stable-request"
+    )
+    second = build_explicit_transfer_workflow(
+        "send 50 EUR to Lucas", CONTEXT, workflow_id="trf-stable-request"
+    )
+    assert first is not None and second is not None
+    assert first["action_id"] == second["action_id"]
+    assert transfer_operation_id("trf-stable-request", "contact-search") == transfer_operation_id(
+        "trf-stable-request", "contact-search"
+    )
+
+
+def test_transfer_draft_replay_status_requires_both_workflow_and_action_identity():
+    workflow = {"workflow_id": "trf-123", "action_id": "act-123"}
+    assert (
+        transfer_draft_replay_status(
+            workflow, {"workflow_id": "trf-123", "action_id": "act-123", "status": "open"}
+        )
+        == "open"
+    )
+    assert (
+        transfer_draft_replay_status(
+            workflow, {"workflow_id": "trf-123", "action_id": "act-other", "status": "open"}
+        )
+        is None
+    )
+    assert (
+        transfer_draft_replay_status(
+            workflow, {"workflow_id": "trf-other", "action_id": "act-123", "status": "open"}
+        )
+        is None
+    )

@@ -248,3 +248,25 @@ def test_demo_agui_reaches_browser_receipt_acknowledgement_before_final_replay_g
     assert guard < tool_result < ack_return
     # The replay helper's unit contract deliberately excludes raw ToolMessages;
     # this block therefore runs on a new browser receipt and emits the final ack.
+
+
+def test_explicit_transfer_replay_uses_stable_request_and_operation_ids():
+    source = AGENT_PATH.read_text(encoding="utf-8")
+    start = source.index("def _start_explicit_transfer_workflow(")
+    end = source.find("\ndef ", start + 5)
+    body = source[start : end if end >= 0 else None]
+    assert "transfer_workflow_id(messages, thread_id)" in body
+    assert "transfer_draft_replay_status(" in body
+    assert "transfer_operation_id(" in body
+    assert "transfer_workflow_replay_suppressed" in body
+
+
+def test_transfer_frontend_action_registration_is_stable_across_lifecycle_updates():
+    source = (ROOT / "apps" / "web" / "src" / "main.jsx").read_text(encoding="utf-8")
+    marker = "name: 'prepare_transfer_draft'"
+    start = source.index(marker)
+    next_hook = source.find("\n  const dateLabel", start)
+    body = source[start:next_hook]
+    assert "transferActionRuntimeRef.current" in body
+    assert "}, [])" in body
+    assert "}, [accounts, contacts, transferDraftLifecycle])" not in body

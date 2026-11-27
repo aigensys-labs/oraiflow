@@ -1,4 +1,4 @@
-# Transfer preparation workflow — current contract (v0.7.8)
+# Transfer preparation workflow — current contract
 
 ## Scope and authority
 
@@ -82,3 +82,22 @@ model-backed graph and deterministic demo AG-UI adapter follow the same order:
 A later user message is a new turn and is not blocked by the previous
 acknowledgement. Closing a draft does not authorize or submit a transfer.
 
+## Replay protection and frontend lifecycle
+
+Transfer preparation uses a stable workflow/action identity derived from the
+current customer message identity and conversation thread. Re-entering the
+agent for the same AG-UI message therefore reuses the same contact-search,
+account-read and draft-action IDs instead of minting another draft action.
+
+The browser keeps the `prepare_transfer_draft` frontend tool registered for the
+lifetime of the application. Its handler reads current account, contact, modal
+and lifecycle state through a ref; opening the modal updates that state without
+causing the in-flight tool registration to be removed and re-added. A second
+invocation for the same action returns the existing result without opening
+another modal. A second different draft is rejected while a draft is already
+open. Closed or accepted actions cannot be reopened by a delayed replay.
+
+These protections are defense in depth: stable server-side IDs, a correlated
+application-context lifecycle receipt, a one-shot browser receipt cache and a
+terminal assistant acknowledgement. Draft preparation remains separate from
+preview, approval, SCA and payment submission.

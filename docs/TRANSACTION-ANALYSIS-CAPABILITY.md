@@ -1,6 +1,5 @@
 # Transaction analysis — OCCF capability
 
-**Current package:** `v0.7.8`  
 **OCCF registry:** `1.5.17`  
 **Intent contract:** `TRANSACTION_ANALYSIS` `1.2.0`  
 **Capability contract:** `banking.transactions.analyze` `1.1.0`

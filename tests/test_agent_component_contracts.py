@@ -795,6 +795,94 @@ def _agent_test_context():
     }
 
 
+def test_explicit_transfer_replay_reuses_identity_and_never_issues_a_second_search_or_draft():
+    from services.agent_runtime.agent import _start_explicit_transfer_workflow
+    from services.agent_runtime.action_response_guard import (
+        has_successful_frontend_ack_after_latest_user,
+    )
+
+    context = _agent_test_context()
+    request = HumanMessage(
+        content="send 50 EUR to Lucas from everyday",
+        id="agui-user-message-lucas-001",
+    )
+    first = _start_explicit_transfer_workflow(
+        {"messages": [request], "thread_id": "thread-lucas"}, context
+    )
+    assert first is not None
+    assert first.tool_calls[0]["name"] == "search_contacts"
+    workflow = latest_pending_workflow([request, first])
+    assert workflow is not None
+
+    replay_context = {
+        **context,
+        "transfer_draft_state": {
+            "workflow_id": workflow["workflow_id"],
+            "action_id": workflow["action_id"],
+            "status": "open",
+        },
+    }
+    replay = _start_explicit_transfer_workflow(
+        {"messages": [request], "thread_id": "thread-lucas"}, replay_context
+    )
+    assert replay is not None
+    assert not replay.tool_calls
+    assert "already open" in replay.content.casefold()
+    assert replay.name == "oraiflow_action_ack"
+    assert has_successful_frontend_ack_after_latest_user([request, replay])
+
+
+def test_new_transfer_is_blocked_while_another_editable_transfer_draft_is_open():
+    from services.agent_runtime.agent import _start_explicit_transfer_workflow
+
+    context = _agent_test_context()
+    context["transfer_draft_state"] = {
+        "workflow_id": "trf-existing-draft",
+        "action_id": "act-existing-draft",
+        "status": "open",
+    }
+    request = HumanMessage(
+        content="send 75 EUR to Lucas from everyday",
+        id="agui-user-message-lucas-003",
+    )
+    response = _start_explicit_transfer_workflow(
+        {"messages": [request], "thread_id": "thread-lucas"}, context
+    )
+    assert response is not None
+    assert not response.tool_calls
+    assert "already open" in response.content.casefold()
+    assert response.name == "oraiflow_action_ack"
+
+
+def test_closed_transfer_request_replay_is_terminal_and_does_not_reopen():
+    from services.agent_runtime.agent import _start_explicit_transfer_workflow
+
+    context = _agent_test_context()
+    request = HumanMessage(
+        content="send 50 EUR to Lucas from everyday",
+        id="agui-user-message-lucas-002",
+    )
+    first = _start_explicit_transfer_workflow(
+        {"messages": [request], "thread_id": "thread-lucas"}, context
+    )
+    workflow = latest_pending_workflow([request, first])
+    assert workflow is not None
+    closed_context = {
+        **context,
+        "transfer_draft_state": {
+            "workflow_id": workflow["workflow_id"],
+            "action_id": workflow["action_id"],
+            "status": "dismissed",
+        },
+    }
+    replay = _start_explicit_transfer_workflow(
+        {"messages": [request], "thread_id": "thread-lucas"}, closed_context
+    )
+    assert replay is not None
+    assert not replay.tool_calls
+    assert "won't reopen" in replay.content.casefold()
+
+
 def _transfer_assessment(beneficiary, amount, quote):
     return {
         "intent_id": "TRANSFER_PREPARATION",

@@ -1,4 +1,5 @@
 import json
+import re
 from pathlib import Path
 
 from shared.version import __version__
@@ -11,11 +12,11 @@ def _json(path: str) -> dict:
 
 
 def test_python_and_javascript_packages_share_the_release_version():
-    assert __version__ == "0.7.8"
+    assert re.fullmatch(r"\d+\.\d+\.\d+", __version__)
     assert _json("apps/web/package.json")["version"] == __version__
     assert _json("services/copilot_runtime/package.json")["version"] == __version__
     env_example = (ROOT / ".env.example").read_text(encoding="utf-8")
-    assert f"ORAIflow Core v{__version__}" in env_example
+    assert "ORAIflow — local/self-hosted synthetic demo configuration" in env_example
 
 
 def test_python_services_use_the_canonical_version_constant():
@@ -50,6 +51,16 @@ def test_local_temporal_dev_image_is_not_a_mutable_latest_tag():
     compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
     assert "image: temporalio/temporal:1.10.1" in compose
     assert "image: temporalio/temporal:latest" not in compose
+
+
+def test_repository_and_compose_project_use_the_oraiflow_identity():
+    compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+
+    assert compose.startswith("name: oraiflow\n")
+    # Keep the pre-existing Docker volume identity so upgrading does not orphan demo data.
+    assert "name: oraiflow-core_postgres-data" in compose
+    assert "git clone <published-repository-url> oraiflow" in readme
 
 
 def test_pyproject_is_the_authoritative_python_application_manifest():
@@ -95,3 +106,39 @@ def test_github_issue_and_pull_request_templates_are_present():
     assert "🧭" in agent_form
     assert "synthetic demo data" in bug_form.casefold()
     assert "synthetic demo data" in agent_form.casefold()
+
+
+def test_stable_public_docs_do_not_pin_the_application_release_version():
+    version_pattern = re.compile(rf"(?<![0-9.])v?{re.escape(__version__)}(?![0-9.])")
+    candidates = [ROOT / "README.md", ROOT / ".env.example", ROOT / "CONTRIBUTING.md"]
+    candidates.extend((ROOT / "docs").rglob("*.md"))
+    candidates.extend((ROOT / ".github").rglob("*.yml"))
+    candidates.extend((ROOT / ".github").rglob("*.yaml"))
+
+    offenders = [
+        str(path.relative_to(ROOT))
+        for path in candidates
+        if path.is_file() and version_pattern.search(path.read_text(encoding="utf-8"))
+    ]
+    assert not offenders, f"Stable public docs must not pin the release version: {offenders}"
+
+
+def test_agui_adapter_imports_snapshot_serialization_dependencies():
+    import ast
+
+    source = (ROOT / "services/agent_runtime/agui.py").read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    imported_names = {
+        alias.asname or alias.name.split(".")[0]
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Import)
+        for alias in node.names
+    }
+    imported_names.update(
+        alias.asname or alias.name
+        for node in ast.walk(tree)
+        if isinstance(node, ast.ImportFrom) and node.module == "typing"
+        for alias in node.names
+    )
+
+    assert {"json", "Any"}.issubset(imported_names)

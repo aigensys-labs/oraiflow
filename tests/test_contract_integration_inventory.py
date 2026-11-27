@@ -196,7 +196,12 @@ def test_frontend_capability_executor_enforces_registry_preconditions_and_result
     assert "case 'context_field_present'" in source
     assert "case 'context_collection_contains_argument'" in source
     assert "outcome: 'INVALID_RESPONSE'" in source
-    assert app.count("{ context: agentApplicationContext }") == 3
+    # Navigation and account selection use the current application context
+    # directly. Transfer preparation reads it through a stable runtime ref so
+    # lifecycle updates do not refresh an in-flight CopilotKit tool handler.
+    assert app.count("{ context: agentApplicationContext }") == 2
+    assert "{ context: runtime.context || agentApplicationContext }" in app
+    assert "transferActionRuntimeRef.current = {" in app
     assert (
         "navigationActionRuntimeRef.current = { navigate, context: agentApplicationContext, navigationEpoch: manualNavigationEpochRef.current }"
         in app

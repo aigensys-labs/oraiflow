@@ -9,6 +9,8 @@ selects a beneficiary or authorizes a payment on its own.
 
 from __future__ import annotations
 
+import hashlib
+import json
 import re
 import uuid
 from decimal import Decimal, InvalidOperation
@@ -20,6 +22,7 @@ from shared.pending_task import (
     attach_pending_task,
     message_metadata,
     message_type,
+    message_value,
     pending_task_from_message,
 )
 from shared.contact_resolution import extract_contact_transfer_request
@@ -29,6 +32,62 @@ from shared.contact_resolution import (
     is_contact_resolution_cancel,
     resolve_contact_choice,
 )
+
+
+def transfer_workflow_id(messages: list[Any], thread_id: str = "") -> str:
+    """Return a stable workflow ID for replays of the same customer message.
+
+    AG-UI/CopilotKit can resume a run after a browser tool result. The same
+    customer message must therefore resolve to the same workflow identity; a
+    fresh user message in the same thread receives a different identity.
+    """
+    items = list(messages or [])
+    latest_human_index = max(
+        (index for index, message in enumerate(items) if message_type(message) == "human"),
+        default=-1,
+    )
+    if latest_human_index < 0:
+        raise ValueError("A transfer workflow requires a customer message identity")
+    message = items[latest_human_index]
+    message_id = str(message_value(message, "id", "") or "")
+    content = message_value(message, "content", "")
+    if not isinstance(content, str):
+        content = json.dumps(content, ensure_ascii=False, sort_keys=True, default=str)
+    # Prefer the stable AG-UI message identity so transcript trimming or
+    # checkpoint rehydration cannot mint a new workflow for the same request.
+    # Fall back to the full-history index plus content for native callers that
+    # do not provide message IDs.
+    message_identity = (
+        ["message", message_id] if message_id else ["position", latest_human_index, content]
+    )
+    identity = json.dumps(
+        [str(thread_id or ""), message_identity],
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
+    digest = hashlib.sha256(identity.encode("utf-8")).hexdigest()[:32]
+    return f"trf-{digest}"
+
+
+def transfer_operation_id(workflow_id: str, operation: str) -> str:
+    """Return a deterministic identifier for one operation within a transfer."""
+    digest = hashlib.sha256(f"{workflow_id}:{operation}".encode("utf-8")).hexdigest()[:32]
+    return f"act-{digest}"
+
+
+def transfer_draft_replay_status(
+    workflow: dict[str, Any],
+    draft_state: dict[str, Any] | None,
+) -> str | None:
+    """Classify an application draft receipt correlated to this workflow."""
+    if not isinstance(draft_state, dict):
+        return None
+    same_workflow = draft_state.get("workflow_id") == workflow.get("workflow_id")
+    same_action = draft_state.get("action_id") == workflow.get("action_id")
+    if not (same_workflow and same_action):
+        return None
+    status = str(draft_state.get("status", "")).casefold()
+    return status if status in {"open", "dismissed", "closed", "accepted"} else None
 
 
 def _normalise(value: Any) -> str:
@@ -221,9 +280,10 @@ def build_transfer_workflow(
     # A selected UI account is not evidence of the transfer currency. Preserve
     # an omitted currency as a missing slot and ask the customer to confirm it
     # after resolving the saved recipient.
+    resolved_workflow_id = workflow_id or f"trf-{uuid.uuid4().hex}"
     workflow = {
-        "workflow_id": workflow_id or f"trf-{uuid.uuid4().hex}",
-        "action_id": f"act-{uuid.uuid4().hex}",
+        "workflow_id": resolved_workflow_id,
+        "action_id": transfer_operation_id(resolved_workflow_id, "prepare-transfer-draft"),
         "workflow_type": "TRANSFER_PREPARATION",
         "stage": "CONTACT_SEARCH_PENDING",
         "amount": amount,

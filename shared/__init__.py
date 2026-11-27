@@ -1,1 +1,1 @@
-"""Shared domain and infrastructure primitives for ORAIflow Core."""
+"""Shared domain and infrastructure primitives for ORAIflow."""
